@@ -456,19 +456,6 @@ export default function Home() {
             </div>
             
             <div className="flex space-x-3">
-              <button 
-                onClick={() => {
-                  console.log('=== MANUAL DEBUG ===')
-                  console.log('Current season:', currentSeason)
-                  console.log('Current week:', currentWeek)
-                  console.log('Games state:', games)
-                  console.log('Games state keys:', Object.keys(games))
-                  loadGames()
-                }}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
-              >
-                🐛 Debug Games
-              </button>
               
               <button 
                 onClick={() => setAutoRefresh(!autoRefresh)}
