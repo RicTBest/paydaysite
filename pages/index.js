@@ -398,12 +398,17 @@ export default function Home() {
 
   async function loadGooseProbabilities(owners) {
     try {
+      console.log('Starting goose probability calculation...')
+      console.log('Current probabilities state:', Object.keys(probabilities).length, 'teams have probabilities')
+      
       const goosePromises = owners.map(async (owner) => {
         const response = await fetch(`/api/goose-probability?owner_id=${owner.id}&week=${currentWeek}&season=${currentSeason}`)
         if (response.ok) {
           const data = await response.json()
+          console.log(`Goose data for ${owner.name}:`, data.goosePercentage, '- Reason:', data.reason)
           return { ownerId: owner.id, ...data }
         }
+        console.error(`Goose API failed for ${owner.name}:`, response.status)
         return { ownerId: owner.id, gooseProbability: 0, reason: 'Error loading' }
       })
 
@@ -412,6 +417,7 @@ export default function Home() {
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
+      console.log('Final goose map:', gooseMap)
       setGooseData(gooseMap)
     } catch (error) {
       console.error('Error loading goose probabilities:', error)
