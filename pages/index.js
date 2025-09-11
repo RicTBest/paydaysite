@@ -524,7 +524,7 @@ export default function Home() {
             }
 
             const getGooseString = (numGooses) => {
-              if (numGooses <= 0) return ''
+              if (numGooses < 1) return ''
               return '🥚'.repeat(numGooses)
             }
             
