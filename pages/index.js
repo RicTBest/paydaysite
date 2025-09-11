@@ -72,17 +72,17 @@ export default function Home() {
             if (status === 'STATUS_IN_PROGRESS') {
               const myScore = isHome ? homeScore : awayScore
               const theirScore = isHome ? awayScore : homeScore
-              if (myScore === theirScore) return `${base}|tied ${myScore}-${theirScore}`
-              if (myScore > theirScore) return `${base}|ahead ${myScore}-${theirScore}`
-              return `${base}|trailing ${myScore}-${theirScore}`
+              if (myScore === theirScore) return `${base} | tied ${myScore}-${theirScore}`
+              if (myScore > theirScore) return `${base} | leading ${myScore}-${theirScore}`
+              return `${base} | trailing ${myScore}-${theirScore}`
             }
             
             if (status === 'STATUS_FINAL') {
               const myScore = isHome ? homeScore : awayScore
               const theirScore = isHome ? awayScore : homeScore
-              if (myScore > theirScore) return `${base}|won ${myScore}-${theirScore}`
-              if (myScore < theirScore) return `${base}|lost ${myScore}-${theirScore}`
-              return `${base}|tied ${myScore}-${theirScore}`
+              if (myScore > theirScore) return `${base} | won ${myScore}-${theirScore}`
+              if (myScore < theirScore) return `${base} | lost ${myScore}-${theirScore}`
+              return `${base} | tied ${myScore}-${theirScore}`
             }
             
             return base
