@@ -510,7 +510,7 @@ export default function Home() {
         <div className="space-y-8">
           {leaderboard.map((owner, index) => {
             const goose = gooseData[owner.id] || {}
-            const hasGooseRisk = goose.gooseProbability > 0.05
+            const hasGooseRisk = goose.gooseProbability > 0.15
             const rank = owner.rank
             const isLeader = rank === 1
             const isTop3 = rank <= 3
