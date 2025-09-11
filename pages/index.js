@@ -221,7 +221,7 @@ export default function Home() {
           ownerStats[ownerId] = {
             id: ownerId,
             name: owner.name,
-            num_gooses = owner.num_gooses,
+            num_gooses: owner.num_gooses,
             totalEarnings: 0,
             wins: 0,
             obo: 0,
