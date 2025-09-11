@@ -1,7 +1,36 @@
 import { supabase } from '../../lib/supabase'
 
 export default async function handler(req, res) {
-  const { owner_id, week = 2, season = 2025 } = req.query
+  // Handle both GET and POST
+  let owner_id, week, season, providedProbabilities
+  
+  if (req.method === 'POST') {
+    ({ owner_id, week, season, probabilities: providedProbabilities } = req.body)
+  } else {
+    ({ owner_id, week, season } = req.query)
+  }
+  
+  // Get current week/season if not provided
+  if (!week || !season) {
+    try {
+      const currentWeekResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/current-week`)
+      if (currentWeekResponse.ok) {
+        const currentData = await currentWeekResponse.json()
+        week = week || currentData.week
+        season = season || currentData.season
+        console.log(`Goose calc: Using current week ${week}, season ${season}`)
+      } else {
+        // Fallback if current-week API fails
+        week = week || 2
+        season = season || 2025
+        console.warn(`Goose calc: Failed to get current week, using fallback week ${week}, season ${season}`)
+      }
+    } catch (error) {
+      console.error('Error getting current week for goose calc:', error)
+      week = week || 2
+      season = season || 2025
+    }
+  }
   
   try {
     // Get owner's teams
@@ -37,16 +66,6 @@ export default async function handler(req, res) {
       throw new Error(`Database error checking wins: ${winsError.message}`)
     }
 
-    // if (wins && wins.length > 0) {
-    //   return res.status(200).json({ 
-    //     gooseProbability: 0,
-    //     goosePercentage: '0%',
-    //     reason: `Already has ${wins.length} win(s) in Week ${week}`,
-    //     wins: wins.map(w => `${w.team_abbr} - ${w.type}`),
-    //     teamDetails: []
-    //   })
-    // }
-
     // Get games for this week to check matchups
     const { data: games, error: gamesError } = await supabase
       .from('games')
@@ -78,16 +97,22 @@ export default async function handler(req, res) {
       })
     }
 
-    // Get current win probabilities for all teams
-    const probResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/kalshi-probabilities?week=${week}&season=${season}`)
+    // Get probabilities - use provided ones or fetch fresh
     let probabilities = {}
     
-    if (probResponse.ok) {
-      const probData = await probResponse.json()
-      probabilities = probData.probabilities || {}
-      console.log(`Goose calc: Got ${Object.keys(probabilities).length} probabilities for week ${week}`)
+    if (providedProbabilities && Object.keys(providedProbabilities).length > 0) {
+      probabilities = providedProbabilities
+      console.log(`Goose calc: Using provided probabilities for ${Object.keys(probabilities).length} teams`)
     } else {
-      console.error('Failed to get probabilities for goose calculation')
+      // Fallback to fetching (for GET requests or when no probabilities provided)
+      const probResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/kalshi-probabilities?week=${week}&season=${season}`)
+      if (probResponse.ok) {
+        const probData = await probResponse.json()
+        probabilities = probData.probabilities || {}
+        console.log(`Goose calc: Fetched fresh probabilities for ${Object.keys(probabilities).length} teams`)
+      } else {
+        console.error('Failed to get probabilities for goose calculation')
+      }
     }
 
     // Calculate goose probability
@@ -160,7 +185,8 @@ export default async function handler(req, res) {
       reason: gooseProb > 0 ? `All ${teams.length} teams must lose` : 'Cannot goose',
       teamCount: teams.length,
       teamDetails,
-      calculation: `${teamDetails.map(t => `${((1-t.winProbability) * 100).toFixed(0)}%`).join(' × ')} = ${(gooseProb * 100).toFixed(1)}%`
+      calculation: `${teamDetails.map(t => `${((1-t.winProbability) * 100).toFixed(0)}%`).join(' × ')} = ${(gooseProb * 100).toFixed(1)}%`,
+      dataSource: providedProbabilities ? 'provided_probabilities' : 'fetched_fresh'
     })
 
   } catch (error) {

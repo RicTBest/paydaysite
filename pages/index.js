@@ -402,7 +402,20 @@ export default function Home() {
       console.log('Current probabilities state:', Object.keys(probabilities).length, 'teams have probabilities')
       
       const goosePromises = owners.map(async (owner) => {
-        const response = await fetch(`/api/goose-probability?owner_id=${owner.id}&week=${currentWeek}&season=${currentSeason}`)
+        // Pass current probabilities to avoid API making another Kalshi call
+        const response = await fetch(`/api/goose-probability`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            owner_id: owner.id,
+            week: currentWeek,
+            season: currentSeason,
+            probabilities: probabilities // Pass fresh probabilities
+          })
+        })
+        
         if (response.ok) {
           const data = await response.json()
           console.log(`Goose data for ${owner.name}:`, data.goosePercentage, '- Reason:', data.reason)
@@ -721,4 +734,4 @@ export default function Home() {
 // Rebuild Thu Sep 11 10:40:09 EDT 2025
 // Rebuild Thu Sep 11 10:43:42 EDT 2025
 // Rebuild Thu Sep 11 10:45:38 EDT 2025
-// Rebuild Thu Sep 11 10:46:12 EDT 2023
+// Rebuild Thu Sep 11 10:46:12 EDT 2025
