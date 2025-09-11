@@ -221,6 +221,7 @@ export default function Home() {
           ownerStats[ownerId] = {
             id: ownerId,
             name: owner.name,
+            num_gooses = owner.num_gooses,
             totalEarnings: 0,
             wins: 0,
             obo: 0,
@@ -522,11 +523,6 @@ export default function Home() {
               if (rank === 3) return '🥉'
               return ''
             }
-
-            const getGooseString = (numGooses) => {
-              if (numGooses < 1) return ''
-              return '🥚'.repeat(numGooses)
-            }
             
             return (
               <div 
@@ -560,7 +556,7 @@ export default function Home() {
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
-                          {getGooseString(numGooses) && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{getGooseString(numGooses)}</span>}
+                          {'🥚'.repeat(numGooses) && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{'🥚'.repeat(numGooses)}</span>}
                           {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
                         <div className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
