@@ -120,6 +120,7 @@ export default async function handler(req, res) {
     // So goose probability = product of (1 - win_probability) for each team
     
     let gooseProb = 1
+    let teamsPlayed = 0
     const teamDetails = []
     
     for (const team of teams) {
@@ -163,9 +164,10 @@ export default async function handler(req, res) {
         teamDetails[teamDetails.length - 1].game = `${game.away} @ ${game.home}`
         
         if (game.final) {
+          teamsPlayed += 1
           // Game is over, we know the result
           const teamWon = (game.home === teamAbbr && game.home_pts > game.away_pts) ||
-                         (game.away === teamAbbr && game.away_pts > game.home_pts)
+                         (game.away === teamAbbr && game.away_pts >= game.home_pts)
           teamDetails[teamDetails.length - 1].actualResult = teamWon ? 'WIN' : 'LOSS'
           
           // If any game is already won, goose probability is 0
@@ -182,7 +184,7 @@ export default async function handler(req, res) {
     res.status(200).json({ 
       gooseProbability: gooseProb,
       goosePercentage: `${(gooseProb * 100).toFixed(1)}%`,
-      reason: gooseProb > 0 ? `All ${teams.length} teams must lose` : 'Cannot goose',
+      reason: gooseProb > 0 ? `${teams.length - teamsPlayed} more teams must lose` : 'Cannot goose',
       teamCount: teams.length,
       teamDetails,
       calculation: `${teamDetails.map(t => `${((1-t.winProbability) * 100).toFixed(0)}%`).join(' × ')} = ${(gooseProb * 100).toFixed(1)}%`,
