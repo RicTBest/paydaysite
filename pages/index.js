@@ -192,7 +192,7 @@ export default function Home() {
 
       const { data: owners } = await supabase
         .from('owners')
-        .select('id, name')
+        .select('id, name, num_gooses')
 
       const teamLookup = {}
       const ownerLookup = {}
@@ -512,6 +512,7 @@ export default function Home() {
             const goose = gooseData[owner.id] || {}
             const hasGooseRisk = goose.gooseProbability > 0.15
             const rank = owner.rank
+            const numGooses = owner.num_gooses
             const isLeader = rank === 1
             const isTop3 = rank <= 3
             
@@ -520,6 +521,11 @@ export default function Home() {
               if (rank === 2) return '🥈'
               if (rank === 3) return '🥉'
               return ''
+            }
+
+            const getGooseString = (numGooses) => {
+              if (numGooses <= 0) return ''
+              return '🥚'.repeat(numGooses)
             }
             
             return (
@@ -554,6 +560,7 @@ export default function Home() {
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
+                          {getGooseString(numGooses) && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{getGooseString(numGooses)}</span>
                           {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
                         <div className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
