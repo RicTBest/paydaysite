@@ -434,32 +434,31 @@ export default function Home() {
       <div className="bg-white shadow-xl border-b-4 border-emerald-500 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-green-500/10"></div>
         <div className="container mx-auto px-4 py-8 relative">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-6 lg:space-y-0">
             <div>
-              <h1 className="text-5xl font-black text-emerald-800 mb-3 tracking-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-800 mb-3 tracking-tight">
                 🏈 PAYDAY FOOTBALL LEAGUE
               </h1>
-              <div className="flex items-center space-x-6 text-emerald-600">
-                <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-emerald-600">
+                <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full w-fit">
                   Week {currentWeek} • {currentSeason} Season
                 </span>
                 {lastUpdate && (
-                  <span className="text-sm bg-white px-2 py-1 rounded-full shadow">
+                  <span className="text-sm bg-white px-2 py-1 rounded-full shadow w-fit">
                     🕐 Last updated: {lastUpdate.toLocaleTimeString()}
                   </span>
                 )}
-                <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow">
+                <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow w-fit">
                   <div className={`w-3 h-3 rounded-full animate-pulse ${autoRefresh ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                   <span className="text-sm font-medium">Live updates {autoRefresh ? 'ON' : 'OFF'}</span>
                 </div>
               </div>
             </div>
             
-            <div className="flex space-x-3">
-              
+            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
               <button 
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg ${
+                className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
                   autoRefresh 
                     ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
                     : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
@@ -471,7 +470,7 @@ export default function Home() {
               <button 
                 onClick={loadData}
                 disabled={loading}
-                className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center space-x-2"
+                className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
               >
                 {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
                 <span>🔄 REFRESH</span>
@@ -479,7 +478,7 @@ export default function Home() {
               
               <a
                 href="/admin"
-                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg"
+                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
               >
                 ⚙️ Admin
               </a>
@@ -515,16 +514,16 @@ export default function Home() {
                     : 'bg-gradient-to-br from-gray-50 via-white to-gray-50 ring-1 ring-gray-200'
                 }`}
               >
-                <div className={`p-6 ${
+                <div className={`p-4 sm:p-6 ${
                   isLeader 
                     ? 'bg-gradient-to-r from-yellow-200 via-amber-100 to-yellow-200' 
                     : isTop3
                     ? 'bg-gradient-to-r from-emerald-100 via-green-50 to-emerald-100'
                     : 'bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100'
                 }`}>
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-6">
-                      <div className={`text-3xl font-black px-4 py-2 rounded-full shadow-lg transform rotate-3 ${
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
+                    <div className="flex items-center space-x-4 sm:space-x-6">
+                      <div className={`text-2xl sm:text-3xl font-black px-3 sm:px-4 py-2 rounded-full shadow-lg transform rotate-3 ${
                         isLeader 
                           ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-yellow-900' 
                           : isTop3
@@ -534,33 +533,33 @@ export default function Home() {
                         #{rank}
                       </div>
                       <div>
-                        <h2 className="text-3xl font-black text-gray-800 flex items-center space-x-3 mb-1">
+                        <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
-                          {getRankEmoji(rank) && <span className={`text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
+                          {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
-                        <div className="text-4xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+                        <div className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
                           ${owner.totalEarnings}
                         </div>
                       </div>
                     </div>
                     
-                    <div className="text-right">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow">
-                          🏆 {owner.wins} WINS
+                    <div className="flex flex-col sm:text-right space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                          🏆 {owner.wins}
                         </span>
-                        <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow">
-                          🔥 {owner.obo} OBO
+                        <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                          🔥 {owner.obo}
                         </span>
-                        <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow">
-                          🛡️ {owner.dbo} DBO
+                        <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                          🛡️ {owner.dbo}
                         </span>
-                        <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow">
-                          🏁 {owner.eoy} EOY
+                        <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                          🏁 {owner.eoy}
                         </span>
                       </div>
                       
-                      <div className={`text-sm font-bold px-4 py-2 rounded-full shadow-lg ${
+                      <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
                         goose.gooseProbability > 0.3 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
                         goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
                         'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
@@ -571,19 +570,19 @@ export default function Home() {
                   </div>
                   
                   {hasGooseRisk && (
-                    <div className="mt-4 p-4 bg-gradient-to-r from-yellow-200 to-orange-200 border-l-4 border-yellow-500 rounded-lg shadow-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="font-black text-yellow-800 text-lg">
+                    <div className="mt-4 p-3 sm:p-4 bg-gradient-to-r from-yellow-200 to-orange-200 border-l-4 border-yellow-500 rounded-lg shadow-lg">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                        <span className="font-black text-yellow-800 text-sm sm:text-lg">
                           🚨 HIGH GOOSE ALERT: {goose.goosePercentage} chance of scoring 0 points! 🚨
                         </span>
-                        <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full">{goose.reason}</span>
+                        <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full w-fit">{goose.reason}</span>
                       </div>
                     </div>
                   )}
                 </div>
                 
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="p-4 sm:p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {owner.teamsSorted?.map(team => {
                       const prob = probabilities[team.abbr]
                       const game = games[team.abbr]
@@ -632,31 +631,31 @@ export default function Home() {
                         'border-red-300'
                       
                       return (
-                        <div key={team.abbr} className={`bg-white rounded-xl p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 ${performanceBorder}`}>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center space-x-3">
+                        <div key={team.abbr} className={`bg-white rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 ${performanceBorder}`}>
+                          <div className="flex justify-between items-start mb-3 sm:mb-4">
+                            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                               <img 
                                 src={`https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/${team.abbr.toLowerCase()}.png`}
                                 alt={`${team.abbr} logo`}
-                                className="w-10 h-10 object-contain"
+                                className="w-8 h-8 sm:w-10 sm:h-10 object-contain flex-shrink-0"
                                 onError={(e) => {
                                   e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                                 }}
                               />
-                              <div>
-                                <div className="font-black text-xl text-gray-800">{team.abbr}</div>
-                                <div className="text-sm text-gray-600 font-medium">{opponentText}</div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-black text-lg sm:text-xl text-gray-800">{team.abbr}</div>
+                                <div className="text-xs sm:text-sm text-gray-600 font-medium truncate">{opponentText}</div>
                                 {enhancedStatusText && (
-                                  <div className="text-xs text-gray-500 font-medium">{enhancedStatusText}</div>
+                                  <div className="text-xs text-gray-500 font-medium truncate">{enhancedStatusText}</div>
                                 )}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className={`font-black text-lg bg-gradient-to-r ${performanceGradient} bg-clip-text text-transparent`}>
+                            <div className="text-right flex-shrink-0 ml-2">
+                              <div className={`font-black text-base sm:text-lg bg-gradient-to-r ${performanceGradient} bg-clip-text text-transparent`}>
                                 ${team.earnings}
                               </div>
                               {showLiveProbability && (
-                                <div className={`text-xs px-3 py-1 rounded-full font-bold shadow ${
+                                <div className={`text-xs px-2 py-1 rounded-full font-bold shadow mt-1 ${
                                   prob.winProbability > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
                                   prob.winProbability > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
                                   'bg-gradient-to-r from-red-500 to-red-600 text-white'
@@ -665,7 +664,7 @@ export default function Home() {
                                 </div>
                               )}
                               {gameIsComplete && gameResultIcon && (
-                                <div className={`text-lg font-bold ${
+                                <div className={`text-base sm:text-lg font-bold mt-1 ${
                                   gameResultIcon === '✅' ? 'text-green-600' : 'text-red-600'
                                 }`}>
                                   {gameResultIcon}
@@ -674,21 +673,21 @@ export default function Home() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-4 gap-1">
-                            <div className="text-center bg-blue-50 rounded-lg p-2">
-                              <div className="font-black text-blue-600 text-lg">{team.wins}</div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1">
+                            <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2">
+                              <div className="font-black text-blue-600 text-sm sm:text-lg">{team.wins}</div>
                               <div className="text-xs text-blue-500 font-bold">WINS</div>
                             </div>
-                            <div className="text-center bg-orange-50 rounded-lg p-2">
-                              <div className="font-black text-orange-600 text-lg">{team.obo}</div>
+                            <div className="text-center bg-orange-50 rounded-lg p-1.5 sm:p-2">
+                              <div className="font-black text-orange-600 text-sm sm:text-lg">{team.obo}</div>
                               <div className="text-xs text-orange-500 font-bold">OBO</div>
                             </div>
-                            <div className="text-center bg-purple-50 rounded-lg p-2">
-                              <div className="font-black text-purple-600 text-lg">{team.dbo}</div>
+                            <div className="text-center bg-purple-50 rounded-lg p-1.5 sm:p-2">
+                              <div className="font-black text-purple-600 text-sm sm:text-lg">{team.dbo}</div>
                               <div className="text-xs text-purple-500 font-bold">DBO</div>
                             </div>
-                            <div className="text-center bg-red-50 rounded-lg p-2">
-                              <div className="font-black text-red-600 text-lg">{team.eoy}</div>
+                            <div className="text-center bg-red-50 rounded-lg p-1.5 sm:p-2">
+                              <div className="font-black text-red-600 text-sm sm:text-lg">{team.eoy}</div>
                               <div className="text-xs text-red-500 font-bold">EOY</div>
                             </div>
                           </div>
