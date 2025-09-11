@@ -16,11 +16,24 @@ const KALSHI_TEAM_MAPPING = {
 }
 
 // Format date for Kalshi ticker (25SEP14 format - year then date)
-function formatKalshiDate(date) {
-  const d = new Date(date)
-  const day = d.getDate().toString().padStart(2, '0')
-  const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()
-  const year = d.getFullYear().toString().slice(-2)
+function formatKalshiDate(dateLike) {
+  const d = new Date(dateLike)
+
+  const year = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: '2-digit',
+  }).format(d)
+
+  const month = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: 'short',
+  }).format(d).toUpperCase()
+
+  const day = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    day: '2-digit',
+  }).format(d)
+
   return `${year}${month}${day}`
 }
 
