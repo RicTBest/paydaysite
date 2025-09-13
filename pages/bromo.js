@@ -167,6 +167,7 @@ export default function Home() {
     try {
       setLoading(true)
       
+      // Load awards (shared across all leagues)
       let awards = []
       try {
         const { data: awardsData, error } = await supabase
@@ -185,6 +186,7 @@ export default function Home() {
         awards = []
       }
       
+      // Load bromo league specific teams and owners
       const { data: teams } = await supabase
         .from('teams_bromo')
         .select('abbr, name, owner_id')
@@ -194,6 +196,7 @@ export default function Home() {
         .from('owners_bromo')
         .select('id, name, num_gooses')
 
+      // Create lookup maps
       const teamLookup = {}
       const ownerLookup = {}
       
@@ -205,13 +208,17 @@ export default function Home() {
         ownerLookup[owner.id] = owner
       })
 
+      // Create owner stats - this is where we need to map awards to bromo owners
       const ownerStats = {}
       
+      // Process awards - since awards are shared, we need to map them to bromo league owners
       awards?.forEach(award => {
+        // Check if this team exists in bromo league
         const team = teamLookup[award.team_abbr]
-        if (!team) return
+        if (!team) return // Skip if team doesn't exist in bromo league
         
-        const ownerId = award.owner_id || team.owner_id
+        // Use the bromo team's owner_id (not the award's owner_id)
+        const ownerId = team.owner_id
         const owner = ownerLookup[ownerId]
         if (!owner) return
         
@@ -270,6 +277,7 @@ export default function Home() {
         }
       })
 
+      // Ensure all bromo teams have entries (even with 0 stats)
       teams?.forEach(team => {
         const owner = ownerLookup[team.owner_id]
         if (!owner) return
@@ -362,7 +370,7 @@ export default function Home() {
       await Promise.all([
         loadProbabilities(teams),
         loadGooseProbabilities(sortedLeaderboard),
-        loadGames() // Now games are loaded every time
+        loadGames()
       ])
       
       console.log('All data loaded, games state should be updated')
@@ -444,7 +452,7 @@ export default function Home() {
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex justify-center items-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <div className="text-xl font-semibold text-emerald-800">Loading Payday Football League...</div>
+          <div className="text-xl font-semibold text-emerald-800">Loading Bromo League...</div>
         </div>
       </div>
     )
@@ -458,7 +466,7 @@ export default function Home() {
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-6 lg:space-y-0">
             <div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-800 mb-3 tracking-tight">
-                🏈 PAYDAY FOOTBALL LEAGUE
+                🏈 BROMO LEAGUE
               </h1>
               <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-emerald-600">
                 <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full w-fit">
@@ -496,13 +504,6 @@ export default function Home() {
                 {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
                 <span>🔄 REFRESH</span>
               </button>
-              
-              <a
-                href="/admin"
-                className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
-              >
-                ⚙️ Admin
-              </a>
             </div>
           </div>
         </div>
@@ -735,8 +736,4 @@ export default function Home() {
       </div>
     </div>
   )
-}// Rebuild Thu Sep 11 10:31:04 EDT 2025
-// Rebuild Thu Sep 11 10:40:09 EDT 2025
-// Rebuild Thu Sep 11 10:43:42 EDT 2025
-// Rebuild Thu Sep 11 10:45:38 EDT 2025
-// Rebuild Thu Sep 11 10:46:12 EDT 2025
+}
