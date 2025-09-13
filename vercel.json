@@ -11,6 +11,6 @@
     {
       "path": "/api/cron/update-games",
       "schedule": "*/5 * * * *"
-    },
+    }
   ]
 }
