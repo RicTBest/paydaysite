@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function Scoreboard() {
+export default function ScoreboardBromo() {
   const [weeklyScores, setWeeklyScores] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
@@ -9,7 +9,7 @@ export default function Scoreboard() {
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [games, setGames] = useState({})
 
-  ct(() => {
+  useEffect(() => {
     loadCurrentWeek()
   }, [])
 
