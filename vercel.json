@@ -5,10 +5,6 @@
       "schedule": "0 10 * * 2"
     },
     {
-      "path": "/api/cron/live-updates", 
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/update-games",
       "schedule": "*/5 * * * *"
     }
