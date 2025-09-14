@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/fetch-games", 
-      "schedule": "*/5 * * * *"
+      "schedule": "*/1 * * * *"
     }
   ]
 }
