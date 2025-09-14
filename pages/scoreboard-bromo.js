@@ -77,7 +77,7 @@ export default function ScoreboardBromo() {
   async function loadWeeklyData() {
     setLoading(true)
     try {
-      // Load games for the week
+      // Load games for the week first
       await loadGames()
 
       // Load awards for the selected week (shared table)
@@ -166,6 +166,63 @@ export default function ScoreboardBromo() {
         })
       })
 
+      // Add wins from completed games that aren't in awards table yet
+      Object.entries(games).forEach(([teamAbbr, game]) => {
+        if (game.status === 'STATUS_FINAL') {
+          const team = teamLookup[teamAbbr]
+          if (!team) return
+
+          // Check if this team won
+          const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
+          
+          if (isWin) {
+            // Check if we already have a WIN award for this team this week
+            const existingWinAward = awards?.find(award => 
+              award.team_abbr === teamAbbr && 
+              (award.type === 'WIN' || award.type === 'TIE_AWAY')
+            )
+
+            if (!existingWinAward) {
+              // Add the win to our display
+              const ownerId = team.owner_id // This is already the bromo owner_id
+              const owner = ownerLookup[ownerId]
+              if (!owner) return
+
+              const earnings = 5 // $5 for a win
+
+              if (!ownerWeeklyStats[ownerId]) {
+                ownerWeeklyStats[ownerId] = {
+                  id: ownerId,
+                  name: owner.name,
+                  weeklyEarnings: 0,
+                  teams: []
+                }
+              }
+
+              ownerWeeklyStats[ownerId].weeklyEarnings += earnings
+
+              let teamEntry = ownerWeeklyStats[ownerId].teams.find(t => t.abbr === teamAbbr)
+              if (!teamEntry) {
+                teamEntry = {
+                  abbr: teamAbbr,
+                  name: team.name,
+                  earnings: 0,
+                  awards: []
+                }
+                ownerWeeklyStats[ownerId].teams.push(teamEntry)
+              }
+
+              teamEntry.earnings += earnings
+              teamEntry.awards.push({
+                type: game.result === 'tie' ? 'TIE_AWAY' : 'WIN',
+                points: 1,
+                earnings: earnings
+              })
+            }
+          }
+        }
+      })
+
       // Add teams with no awards but ensure they show up
       teams?.forEach(team => {
         const owner = ownerLookup[team.owner_id]
@@ -192,12 +249,22 @@ export default function ScoreboardBromo() {
       })
 
       // Sort owners by weekly earnings, then teams by earnings
+      // Handle ties properly in ranking
       const sortedScores = Object.values(ownerWeeklyStats)
         .sort((a, b) => b.weeklyEarnings - a.weeklyEarnings)
         .map(owner => ({
           ...owner,
           teams: owner.teams.sort((a, b) => b.earnings - a.earnings)
         }))
+
+      // Assign ranks properly handling ties
+      let currentRank = 1
+      sortedScores.forEach((owner, index) => {
+        if (index > 0 && owner.weeklyEarnings < sortedScores[index - 1].weeklyEarnings) {
+          currentRank = index + 1
+        }
+        owner.rank = currentRank
+      })
 
       setWeeklyScores(sortedScores)
       setLoading(false)
@@ -284,19 +351,19 @@ export default function ScoreboardBromo() {
           <div
             key={owner.id}
             className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${
-              index === 0 ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-gray-200'
+              owner.rank === 1 ? 'border-yellow-400 ring-2 ring-yellow-200' : 'border-gray-200'
             }`}
           >
             {/* Owner Header */}
             <div className={`px-4 py-3 ${
-              index === 0 ? 'bg-gradient-to-r from-yellow-100 to-amber-100' : 'bg-gray-50'
+              owner.rank === 1 ? 'bg-gradient-to-r from-yellow-100 to-amber-100' : 'bg-gray-50'
             }`}>
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-3">
                   <div className={`text-lg font-black px-2 py-1 rounded-full ${
-                    index === 0 ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-400 text-gray-900'
+                    owner.rank === 1 ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-400 text-gray-900'
                   }`}>
-                    #{index + 1}
+                    #{owner.rank}
                   </div>
                   <h2 className="text-lg font-black text-gray-800">{owner.name}</h2>
                 </div>
