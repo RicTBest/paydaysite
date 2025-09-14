@@ -21,7 +21,7 @@ export default function Home() {
         console.log('Auto-refreshing data...')
         loadData()
       }
-    }, 5 * 60 * 1000) // 5 minutes
+    }, 1 * 60 * 1000) // 5 minutes
 
     return () => {
       clearInterval(interval)
