@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { ct, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Scoreboard() {
@@ -9,15 +9,21 @@ export default function Scoreboard() {
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [games, setGames] = useState({})
 
-  useEffect(() => {
+  ct(() => {
     loadCurrentWeek()
   }, [])
 
-  useEffect(() => {
-    if (currentSeason && selectedWeek) {
+useEffect(() => {
+  if (currentSeason && selectedWeek) {
+    // Add a small delay to ensure state is properly set
+    const timer = setTimeout(() => {
       loadWeeklyData()
-    }
-  }, [currentSeason, selectedWeek])
+    }, 50)
+    
+    return () => clearTimeout(timer)
+  }
+}, [currentSeason, selectedWeek])
+  
 
   async function loadCurrentWeek() {
     try {
@@ -74,39 +80,42 @@ export default function Scoreboard() {
     }
   }
 
-  async function loadWeeklyData() {
-    setLoading(true)
-    try {
-      // Load games for the week first
-      await loadGames()
+async function loadWeeklyData() {
+  setLoading(true)
+  try {
+    // Load games for the week first and wait for it to complete
+    await loadGames()
 
-      // Load awards for the selected week
-      const { data: awards } = await supabase
-        .from('awards')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
+    // Load awards for the selected week
+    const { data: awards } = await supabase
+      .from('awards')
+      .select('*')
+      .eq('season', currentSeason)
+      .eq('week', selectedWeek)
 
-      // Load teams and owners
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('abbr, name, owner_id')
-        .eq('active', true)
+    // Load teams and owners
+    const { data: teams } = await supabase
+      .from('teams') // or 'teams_bromo' for bromo version
+      .select('abbr, name, owner_id')
+      .eq('active', true)
 
-      const { data: owners } = await supabase
-        .from('owners')
-        .select('id, name')
+    const { data: owners } = await supabase
+      .from('owners') // or 'owners_bromo' for bromo version
+      .select('id, name')
 
-      const teamLookup = {}
-      const ownerLookup = {}
-      
-      teams?.forEach(team => {
-        teamLookup[team.abbr] = team
-      })
-      
-      owners?.forEach(owner => {
-        ownerLookup[owner.id] = owner
-      })
+    // Wait a small moment to ensure games state is updated
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const teamLookup = {}
+    const ownerLookup = {}
+    
+    teams?.forEach(team => {
+      teamLookup[team.abbr] = team
+    })
+    
+    owners?.forEach(owner => {
+      ownerLookup[owner.id] = owner
+    })
 
       // Process weekly scores
       const ownerWeeklyStats = {}
