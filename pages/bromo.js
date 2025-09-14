@@ -484,26 +484,33 @@ export default function Home() {
               </div>
             </div>
             
-            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-              <button 
-                onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
-                  autoRefresh 
-                    ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
-                    : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
-                }`}
-              >
-                🔄 Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-              </button>
-              
-              <button 
-                onClick={loadData}
-                disabled={loading}
-                className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
-              >
-                {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
-                <span>🔄 REFRESH</span>
-              </button>
+<div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+  
+    href="/scoreboard"
+    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+  >
+    📊 Scoreboard
+  </a>
+  
+  <button 
+    onClick={() => setAutoRefresh(!autoRefresh)}
+    className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
+      autoRefresh 
+        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
+        : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
+    }`}
+  >
+    🔄 Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+  </button>
+  
+  <button 
+    onClick={loadData}
+    disabled={loading}
+    className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
+  >
+    {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
+    <span>🔄 REFRESH</span>
+  </button>
             </div>
           </div>
         </div>
