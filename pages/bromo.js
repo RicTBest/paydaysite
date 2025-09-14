@@ -489,7 +489,7 @@ export default function Home() {
     href="/scoreboard-bromo"
     className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
   >
-    📊 Scoreboard
+    📅 Scoreboard
   </a>
   
   <button 
