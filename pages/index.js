@@ -504,7 +504,7 @@ export default function Home() {
     <span>🔄 REFRESH</span>
   </button>
   
-  
+  <a
     href="/admin"
     className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
   >
