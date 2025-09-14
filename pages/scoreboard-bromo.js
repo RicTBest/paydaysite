@@ -74,31 +74,34 @@ export default function ScoreboardBromo() {
     }
   }
 
-  async function loadWeeklyData() {
-    setLoading(true)
-    try {
-      // Load games for the week first
-      await loadGames()
+async function loadWeeklyData() {
+  setLoading(true)
+  try {
+    // Load games for the week first and wait for it to complete
+    await loadGames()
 
-      // Load awards for the selected week (shared table)
-      const { data: awards } = await supabase
-        .from('awards')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
+    // Load awards for the selected week
+    const { data: awards } = await supabase
+      .from('awards')
+      .select('*')
+      .eq('season', currentSeason)
+      .eq('week', selectedWeek)
 
-      // Load bromo teams and owners
-      const { data: teams } = await supabase
-        .from('teams_bromo')
-        .select('abbr, name, owner_id')
-        .eq('active', true)
+    // Load teams and owners
+    const { data: teams } = await supabase
+      .from('teams') // or 'teams_bromo' for bromo version
+      .select('abbr, name, owner_id')
+      .eq('active', true)
 
-      const { data: owners } = await supabase
-        .from('owners_bromo')
-        .select('id, name')
+    const { data: owners } = await supabase
+      .from('owners') // or 'owners_bromo' for bromo version
+      .select('id, name')
 
-      const teamLookup = {}
-      const ownerLookup = {}
+    // Wait a small moment to ensure games state is updated
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    const teamLookup = {}
+    const ownerLookup = {}
       
       teams?.forEach(team => {
         teamLookup[team.abbr] = team
