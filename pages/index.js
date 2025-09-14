@@ -584,8 +584,8 @@ export default function Home() {
                       </div>
                       
                       <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
-                        goose.gooseProbability > 0.3 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
-                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
+                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
+                        goose.gooseProbability > 0.05 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
                         'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
                       }`}>
                         🥚 Goose Risk: {goose.goosePercentage || '0%'}
