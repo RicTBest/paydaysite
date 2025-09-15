@@ -409,11 +409,11 @@ export default function Scoreboard() {
                   <div className="text-xs font-semibold text-gray-700">
                     {formatGameTime(game.kickoff)}
                   </div>
-                  {game.status === 'STATUS_IN_PROGRESS' && (
-                    <div className="text-xs font-bold text-blue-600">
-                      {game.awayScore} - {game.homeScore}
-                    </div>
-                  )}
+                  <div className="text-xs font-bold text-blue-600">
+                    {game.status === 'STATUS_FINAL' ? 'Final' :
+                     game.status === 'STATUS_IN_PROGRESS' ? 'In Progress' : 
+                     'Not Started'}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -442,11 +442,11 @@ export default function Scoreboard() {
                           {game.awayDBO && <span>🛡️</span>}
                         </div>
                       </div>
-                      {game.status === 'STATUS_FINAL' && (
-                        <div className="text-sm font-bold text-gray-900 w-5 text-center">
-                          {game.awayScore}
-                        </div>
-                      )}
+                      <div className="text-sm font-bold text-gray-900 w-5 text-center">
+                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' 
+                          ? game.awayScore 
+                          : '0'}
+                      </div>
                     </div>
                   </div>
 
@@ -475,11 +475,11 @@ export default function Scoreboard() {
                           {game.homeDBO && <span>🛡️</span>}
                         </div>
                       </div>
-                      {game.status === 'STATUS_FINAL' && (
-                        <div className="text-sm font-bold text-gray-900 w-5 text-center">
-                          {game.homeScore}
-                        </div>
-                      )}
+                      <div className="text-sm font-bold text-gray-900 w-5 text-center">
+                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' 
+                          ? game.homeScore 
+                          : '0'}
+                      </div>
                     </div>
                   </div>
                 </div>
