@@ -61,10 +61,13 @@ export default function Scoreboard() {
   async function loadWeeklyData() {
     setLoading(true)
     try {
-      // Load probabilities first
-      await loadProbabilities()
+      console.log('Loading data for season:', currentSeason, 'week:', selectedWeek)
       
-      // Load all data in parallel
+      // Load probabilities FIRST and get the return value
+      const freshProbabilities = await loadProbabilities()
+      console.log('Fresh probabilities loaded:', Object.keys(freshProbabilities).length, 'teams')
+      
+      // Load all other data in parallel
       const [gamesResponse, awardsResponse, teamsResponse, ownersResponse] = await Promise.all([
         supabase.from('games').select('*').eq('season', currentSeason).eq('week', selectedWeek),
         supabase.from('awards').select('*').eq('season', currentSeason).eq('week', selectedWeek),
@@ -76,6 +79,10 @@ export default function Scoreboard() {
       const { data: awards } = awardsResponse
       const { data: teams } = teamsResponse
       const { data: owners } = ownersResponse
+
+      console.log('Games data:', gamesData?.length, 'games')
+      console.log('Awards data:', awards?.length, 'awards')
+      console.log('Teams data:', teams?.length, 'teams')
 
       const teamLookup = {}
       const ownerLookup = {}
@@ -166,6 +173,10 @@ export default function Scoreboard() {
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
 
+          // Use the fresh probabilities directly
+          const homeProb = freshProbabilities[game.home]
+          const awayProb = freshProbabilities[game.away]
+          
           processedGames.push({
             id: `${game.home}-${game.away}`,
             kickoff: game.kickoff,
@@ -186,8 +197,14 @@ export default function Scoreboard() {
             awayOBO: awayTeam?.hasOBO || false,
             homeDBO: homeTeam?.hasDBO || false,
             awayDBO: awayTeam?.hasDBO || false,
-            homeProb: probabilities[game.home],
-            awayProb: probabilities[game.away]
+            homeProb: homeProb,
+            awayProb: awayProb
+          })
+          
+          console.log(`Game ${game.home} vs ${game.away}:`, {
+            homeProb: homeProb ? `${(homeProb.winProbability * 100).toFixed(0)}%` : 'none',
+            awayProb: awayProb ? `${(awayProb.winProbability * 100).toFixed(0)}%` : 'none',
+            status: game.status
           })
         })
       }
@@ -229,6 +246,13 @@ export default function Scoreboard() {
       setOwnerRankings(sortedOwners)
       setGames(processedGames)
       setLoading(false)
+      
+      console.log('Final processed games with probabilities:', processedGames.length)
+      console.log('Sample game probs:', processedGames.slice(0, 2).map(g => ({
+        teams: `${g.awayTeam}@${g.homeTeam}`,
+        homeProb: g.homeProb,
+        awayProb: g.awayProb
+      })))
     } catch (error) {
       console.error('Error loading weekly data:', error)
       setLoading(false)
