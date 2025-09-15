@@ -517,7 +517,7 @@ export default function BromoScoreboard() {
           <div className="text-center">
             <div className="flex justify-between items-center mb-4">
               <a
-                href="/bromos"
+                href="/bromo"
                 className="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center space-x-1"
               >
                 <span>←</span>
@@ -669,9 +669,9 @@ export default function BromoScoreboard() {
                           {game.homeOwner !== 'Non-Bromo' ? `$${game.homeEarnings}` : '—'}
                         </div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
-                          {getGameStatusDisplay(game, true)}
                           {game.homeOBO && <span>🔥</span>}
                           {game.homeDBO && <span>🛡️</span>}
+                          {getGameStatusDisplay(game, true)}
                         </div>
                       </div>
                       <div className="text-sm font-bold text-gray-900 w-5 text-center">
