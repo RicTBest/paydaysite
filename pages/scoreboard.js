@@ -57,7 +57,7 @@ export default function Scoreboard() {
     }
   }
 
-  // EXACT copy from index.js
+  // Fixed loadGames function
   async function loadGames() {
     console.log('=== STARTING LOADGAMES ===')
     console.log('Current season:', currentSeason, 'Current week:', selectedWeek)
@@ -76,12 +76,15 @@ export default function Scoreboard() {
         
         gamesData.forEach((game, index) => {
           console.log(`Game ${index + 1}: ${game.home} vs ${game.away}, status: ${game.status}`)
+          console.log(`Scores: ${game.home} ${game.home_pts} - ${game.away} ${game.away_pts}`)
           
           const getGameResult = (isHome, status, homeScore, awayScore) => {
             if (status !== 'STATUS_FINAL') return null
             
             const myScore = isHome ? homeScore : awayScore
             const theirScore = isHome ? awayScore : homeScore
+            
+            console.log(`Calculating result for ${isHome ? 'home' : 'away'}: myScore=${myScore}, theirScore=${theirScore}`)
             
             if (myScore > theirScore) return 'win'
             if (myScore < theirScore) return 'loss'
@@ -91,23 +94,29 @@ export default function Scoreboard() {
           const homeResult = getGameResult(true, game.status, game.home_pts, game.away_pts)
           const awayResult = getGameResult(false, game.status, game.home_pts, game.away_pts)
           
+          console.log(`Results: ${game.home} = ${homeResult}, ${game.away} = ${awayResult}`)
+          
           gameMap[game.home] = {
             opponent: game.away,
             isHome: true,
             status: game.status,
-            result: homeResult
+            result: homeResult,
+            homeScore: game.home_pts,
+            awayScore: game.away_pts
           }
           
           gameMap[game.away] = {
             opponent: game.home,
             isHome: false,
             status: game.status,
-            result: awayResult
+            result: awayResult,
+            homeScore: game.home_pts,
+            awayScore: game.away_pts
           }
         })
         
         console.log('Final game map:', gameMap)
-        setGameState(gameMap) // For probability logic
+        setGameState(gameMap)
         console.log('Games state updated!')
       } else {
         console.log('No games data available - clearing games state')
@@ -253,7 +262,7 @@ export default function Scoreboard() {
         }
       })
 
-      // Build games array for display
+      // Build games array for display - FIXED VERSION
       const { data: gamesData } = await supabase
         .from('games')
         .select('*')
@@ -265,6 +274,10 @@ export default function Scoreboard() {
         gamesData.forEach(game => {
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
+          
+          // Get the game results from gameState
+          const homeGameState = gameState[game.home]
+          const awayGameState = gameState[game.away]
 
           processedGames.push({
             id: `${game.home}-${game.away}`,
@@ -274,8 +287,8 @@ export default function Scoreboard() {
             awayTeam: game.away,
             homeScore: game.home_pts,
             awayScore: game.away_pts,
-            homeResult: gameState[game.home]?.result,
-            awayResult: gameState[game.away]?.result,
+            homeResult: homeGameState?.result,
+            awayResult: awayGameState?.result,
             homeOwner: homeTeam?.ownerName || 'Unknown',
             awayOwner: awayTeam?.ownerName || 'Unknown',
             homeEarnings: homeTeam?.earnings || 0,
@@ -286,8 +299,9 @@ export default function Scoreboard() {
             awayOBO: awayTeam?.hasOBO || false,
             homeDBO: homeTeam?.hasDBO || false,
             awayDBO: awayTeam?.hasDBO || false,
-            homeProb: probabilities[game.home],
-            awayProb: probabilities[game.away]
+            // Fix: Access probabilities from the state, not the parameter
+            homeProb: probabilities[game.home] || null,
+            awayProb: probabilities[game.away] || null
           })
         })
       }
@@ -353,12 +367,14 @@ export default function Scoreboard() {
     }
   }
 
+  // FIXED getGameStatusDisplay function
   const getGameStatusDisplay = (game, isHome) => {
     const result = isHome ? game.homeResult : game.awayResult
     const prob = isHome ? game.homeProb : game.awayProb
 
     // Final games - show check or X emoji
     if (game.status === 'STATUS_FINAL') {
+      // For final games, check if this team won or if it's an away tie
       if (result === 'win' || (result === 'tie' && !isHome)) {
         return <span className="text-green-600">✅</span>
       } else {
@@ -366,8 +382,8 @@ export default function Scoreboard() {
       }
     }
 
-    // Live probability display (match index.js showLiveProbability logic)
-    if (prob && prob.confidence !== 'final') {
+    // For in-progress or scheduled games, show probability if available
+    if (prob && prob.winProbability !== undefined) {
       const winProb = prob.winProbability
       const percentage = (winProb * 100).toFixed(0)
       
@@ -483,6 +499,7 @@ export default function Scoreboard() {
                   <div className="text-xs font-bold text-blue-600">
                     {game.status === 'STATUS_FINAL' ? 'Final' :
                      game.status === 'STATUS_IN_PROGRESS' ? 'In Progress' : 
+                     game.status === 'STATUS_HALFTIME' ? 'Halftime' :
                      'Not Started'}
                   </div>
                 </div>
@@ -514,7 +531,7 @@ export default function Scoreboard() {
                         </div>
                       </div>
                       <div className="text-sm font-bold text-gray-900 w-5 text-center">
-                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' 
+                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' || game.status === 'STATUS_HALFTIME'
                           ? game.awayScore 
                           : '0'}
                       </div>
@@ -547,7 +564,7 @@ export default function Scoreboard() {
                         </div>
                       </div>
                       <div className="text-sm font-bold text-gray-900 w-5 text-center">
-                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' 
+                        {game.status === 'STATUS_FINAL' || game.status === 'STATUS_IN_PROGRESS' || game.status === 'STATUS_HALFTIME'
                           ? game.homeScore 
                           : '0'}
                       </div>
