@@ -252,32 +252,48 @@ export default function Scoreboard() {
     }
   }
 
-  const getTeamStatus = (team, isHome, game) => {
+  const getGameStatusDisplay = (game, isHome) => {
     const result = isHome ? game.homeResult : game.awayResult
     const hasWin = isHome ? game.homeWin : game.awayWin
-    const hasOBO = isHome ? game.homeOBO : game.awayOBO
-    const hasDBO = isHome ? game.homeDBO : game.awayDBO
     const prob = isHome ? game.homeProb : game.awayProb
 
-    let indicators = []
-
-    // Win status
+    // Final games - show check or X emoji
     if (game.status === 'STATUS_FINAL') {
       if (result === 'win' || (result === 'tie' && !isHome)) {
-        indicators.push('✓')
+        return <span className="text-green-600">✅</span>
       } else {
-        indicators.push('✗')
+        return <span className="text-red-600">❌</span>
       }
-    } else if (prob) {
-      const winProb = (prob.winProbability * 100).toFixed(0)
-      indicators.push(`${winProb}%`)
     }
 
-    // OBO/DBO status
-    if (hasOBO) indicators.push('🔥')
-    if (hasDBO) indicators.push('🛡️')
+    // In progress games - show probability with gradient like index.js
+    if (game.status === 'STATUS_IN_PROGRESS' && prob) {
+      const winProb = prob.winProbability
+      const percentage = (winProb * 100).toFixed(0)
+      
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+          winProb > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
+          winProb > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
+          'bg-gradient-to-r from-red-500 to-red-600 text-white'
+        }`}>
+          {percentage}%
+        </span>
+      )
+    }
 
-    return indicators.join(' ')
+    // Scheduled games - show probability without background
+    if (prob) {
+      const winProb = prob.winProbability
+      const percentage = (winProb * 100).toFixed(0)
+      return (
+        <span className={winProb > 0.5 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+          {percentage}%
+        </span>
+      )
+    }
+
+    return <span className="text-gray-400">—</span>
   }
 
   const weekOptions = Array.from({ length: 18 }, (_, i) => i + 1)
