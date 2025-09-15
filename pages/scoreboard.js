@@ -319,10 +319,10 @@ export default function Scoreboard() {
             awayEarnings: awayTeam?.earnings || 0,
             homeWin: homeTeam?.hasWin || false,
             awayWin: awayTeam?.hasWin || false,
-            homeOBO: homeTeam?.hasOBO || false,
-            awayOBO: awayTeam?.hasOBO || false,
-            homeDBO: homeTeam?.hasDBO || false,
-            awayDBO: awayTeam?.hasDBO || false,
+            homeOBO: homeTeam?.oboCount > 0 || false,
+            awayOBO: awayTeam?.oboCount > 0 || false,
+            homeDBO: homeTeam?.dboCount > 0 || false,
+            awayDBO: awayTeam?.dboCount > 0 || false,
             // Use the probabilities directly from the API call
             homeProb: homeProb,
             awayProb: awayProb
