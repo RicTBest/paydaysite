@@ -9,18 +9,18 @@ export default function BromoScoreboard() {
   const [currentWeek, setCurrentWeek] = useState(2)
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [probabilities, setProbabilities] = useState({})
-  const [gameState, setGameState] = useState({}) // For the bye week logic
+  const [gameState, setGameState] = useState({})
+  const [weekFinished, setWeekFinished] = useState(false)
 
   useEffect(() => {
     loadCurrentWeek()
     
-    // Set up auto-refresh every 1 minute
     const interval = setInterval(() => {
       console.log('Auto-refreshing bromo scoreboard data...')
       if (currentSeason && selectedWeek) {
         loadData()
       }
-    }, 60 * 1000) // 1 minute
+    }, 60 * 1000)
 
     return () => {
       clearInterval(interval)
@@ -42,24 +42,26 @@ export default function BromoScoreboard() {
         console.log('Current week API response:', data)
         setCurrentSeason(data.season)
         setCurrentWeek(data.week)
-        setSelectedWeek(data.week)
         
-        // Wait for state to update, then load data
+        // Only set selectedWeek if it's still the default (not manually changed)
+        if (selectedWeek === currentWeek || selectedWeek === 2) {
+          setSelectedWeek(data.week)
+        }
+        
         setTimeout(() => {
           loadData()
         }, 100)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
-      // Fallback to loading data anyway
       loadData()
     }
   }
 
-  // Fixed loadGames function that returns the gameState
   async function loadGames() {
-    console.log('=== STARTING LOADGAMES ===')
-    console.log('Current season:', currentSeason, 'Current week:', selectedWeek)
+    console.log('=== LOADING GAMES ===')
+    console.log('Loading games for season:', currentSeason, 'week:', selectedWeek)
+    
     try {
       const { data: gamesData, error: gamesError } = await supabase
         .from('games')
@@ -67,77 +69,60 @@ export default function BromoScoreboard() {
         .eq('season', currentSeason)
         .eq('week', selectedWeek)
 
-      console.log('Games query completed. Error:', gamesError, 'Data count:', gamesData?.length)
+      console.log('Games query result - Error:', gamesError, 'Count:', gamesData?.length)
 
       if (!gamesError && gamesData && gamesData.length > 0) {
-        console.log('Processing', gamesData.length, 'games...')
         const gameMap = {}
         
         gamesData.forEach((game, index) => {
-          console.log(`Game ${index + 1}: ${game.home} vs ${game.away}, status: ${game.status}`)
-          console.log(`Scores: ${game.home} ${game.home_pts} - ${game.away} ${game.away_pts}`)
+          console.log(`Game ${index + 1}: ${game.home} ${game.home_pts} - ${game.away} ${game.away_pts} (${game.status})`)
           
-          const getGameResult = (isHome, status, homeScore, awayScore) => {
+          const getResult = (isHome, status, homeScore, awayScore) => {
             if (status !== 'STATUS_FINAL') return null
-            
             const myScore = isHome ? homeScore : awayScore
             const theirScore = isHome ? awayScore : homeScore
-            
-            console.log(`Calculating result for ${isHome ? 'home' : 'away'}: myScore=${myScore}, theirScore=${theirScore}`)
-            
-            if (myScore > theirScore) return 'win'
-            if (myScore < theirScore) return 'loss'
-            return 'tie'
+            return myScore > theirScore ? 'win' : myScore < theirScore ? 'loss' : 'tie'
           }
           
-          const homeResult = getGameResult(true, game.status, game.home_pts, game.away_pts)
-          const awayResult = getGameResult(false, game.status, game.home_pts, game.away_pts)
-          
-          console.log(`Results: ${game.home} = ${homeResult}, ${game.away} = ${awayResult}`)
+          const homeResult = getResult(true, game.status, game.home_pts, game.away_pts)
+          const awayResult = getResult(false, game.status, game.home_pts, game.away_pts)
           
           gameMap[game.home] = {
             opponent: game.away,
             isHome: true,
             status: game.status,
-            result: homeResult,
-            homeScore: game.home_pts,
-            awayScore: game.away_pts
+            result: homeResult
           }
           
           gameMap[game.away] = {
             opponent: game.home,
             isHome: false,
             status: game.status,
-            result: awayResult,
-            homeScore: game.home_pts,
-            awayScore: game.away_pts
+            result: awayResult
           }
         })
         
-        console.log('Final game map:', gameMap)
+        console.log('Game results processed:', Object.keys(gameMap).length, 'teams')
         setGameState(gameMap)
-        console.log('Games state updated!')
-        return gameMap // Return the gameMap directly
+        return gameMap
       } else {
-        console.log('No games data available - clearing games state')
+        console.log('No games found')
         setGameState({})
         return {}
       }
     } catch (error) {
-      console.log('Error in loadGames:', error)
+      console.error('Error loading games:', error)
       return {}
     }
   }
 
-  // Fixed loadProbabilities function that accepts gameState as parameter
   async function loadProbabilities(teams, currentGameState = {}) {
     try {
       const response = await fetch(`/api/kalshi-probabilities?week=${selectedWeek}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        console.log(`Loading probabilities for Week ${selectedWeek}:`, data.probabilities)
+        console.log(`Probabilities loaded for Week ${selectedWeek}:`, Object.keys(data.probabilities || {}).length, 'teams')
         
-        // Set probability to 0 for teams without games (bye weeks)
         const adjustedProbabilities = { ...data.probabilities }
         
         teams?.forEach(team => {
@@ -147,8 +132,7 @@ export default function BromoScoreboard() {
         })
         
         setProbabilities(adjustedProbabilities || {})
-        console.log('Probabilities set in state:', adjustedProbabilities)
-        return adjustedProbabilities // Return the probabilities
+        return adjustedProbabilities
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
@@ -156,14 +140,83 @@ export default function BromoScoreboard() {
     }
   }
 
-  // Bromo-specific data loading
+  function checkWeekFinished(gamesData, awards) {
+    console.log('=== CHECKING IF WEEK IS FINISHED ===')
+    
+    if (!gamesData || gamesData.length === 0) {
+      console.log('No games found, week not finished')
+      return false
+    }
+
+    // Check if all games are final
+    const allGamesFinal = gamesData.every(game => game.status === 'STATUS_FINAL')
+    console.log('All games final:', allGamesFinal)
+
+    if (!allGamesFinal) {
+      console.log('Not all games are final, week not finished')
+      return false
+    }
+
+    // Check if there's at least one OBO and one DBO award
+    const hasOBO = awards.some(award => award.type === 'OBO')
+    const hasDBO = awards.some(award => award.type === 'DBO')
+    
+    console.log('Has OBO award:', hasOBO)
+    console.log('Has DBO award:', hasDBO)
+
+    const weekFinished = allGamesFinal && hasOBO && hasDBO
+    console.log('Week finished:', weekFinished)
+    
+    return weekFinished
+  }
+
   async function loadData() {
-    console.log('=== STARTING BROMO LOADDATA ===')
-    console.log('Season:', currentSeason, 'Week:', selectedWeek)
+    console.log('=== STARTING BROMO SCOREBOARD DATA LOAD ===')
+    console.log('Season:', currentSeason, 'Selected Week:', selectedWeek)
+    
     try {
       setLoading(true)
       
-      // Load awards for the selected week
+      // 1. Load base data from bromo tables
+      const [teamsResult, ownersResult] = await Promise.all([
+        supabase.from('teams_bromo').select('abbr, name, owner_id').eq('active', true),
+        supabase.from('owners_bromo').select('id, name')
+      ])
+      
+      const teams = teamsResult.data || []
+      const owners = ownersResult.data || []
+      
+      console.log('Loaded bromo base data:', teams.length, 'teams,', owners.length, 'owners')
+      
+      // 2. Create lookup maps
+      const teamLookup = {}
+      const ownerLookup = {}
+      const teamToOwnerLookup = {} // Maps team abbr to bromo owner info
+      
+      teams.forEach(team => {
+        teamLookup[team.abbr] = team
+      })
+      
+      owners.forEach(owner => {
+        ownerLookup[owner.id] = owner
+      })
+
+      // Create team abbr to bromo owner mapping
+      teams.forEach(team => {
+        const owner = ownerLookup[team.owner_id]
+        if (owner) {
+          teamToOwnerLookup[team.abbr] = owner
+        }
+      })
+      
+      // 3. Load games and probabilities
+      const currentGameState = await loadGames()
+      const currentProbabilities = await loadProbabilities(teams, currentGameState)
+      
+      // 4. Load awards for the selected week (awards reference team_abbr, not owner_id)
+      console.log('=== LOADING AWARDS ===')
+      console.log('Querying awards for season:', currentSeason, 'week:', selectedWeek)
+      
       let awards = []
       try {
         const { data: awardsData, error } = await supabase
@@ -172,65 +225,55 @@ export default function BromoScoreboard() {
           .eq('season', currentSeason)
           .eq('week', selectedWeek)
 
+        console.log('Awards query result:')
+        console.log('  Error:', error)
+        console.log('  Raw data:', awardsData)
+        console.log('  Count:', awardsData?.length || 0)
+        
         if (error) {
-          console.warn('Awards table access denied - using empty data:', error)
+          console.warn('Awards query failed:', error)
           awards = []
         } else {
           awards = awardsData || []
+          console.log('Successfully loaded', awards.length, 'awards')
+          
+          // Log each award for debugging
+          awards.forEach((award, index) => {
+            console.log(`Award ${index + 1}:`, {
+              type: award.type,
+              team: award.team_abbr,
+              points: award.points,
+              week: award.week,
+              season: award.season
+            })
+          })
         }
       } catch (err) {
-        console.warn('Awards table error - using empty data:', err)
+        console.error('Awards query exception:', err)
         awards = []
       }
+
+      // 5. Get games data again for week finished check
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('*')
+        .eq('season', currentSeason)
+        .eq('week', selectedWeek)
+
+      // 6. Check if week is finished
+      const isWeekFinished = checkWeekFinished(gamesData, awards)
+      setWeekFinished(isWeekFinished)
       
-      // Load bromo teams and owners
-      const { data: bromoTeams } = await supabase
-        .from('teams_bromo')
-        .select('abbr, name, owner_id')
-        .eq('active', true)
-
-      const { data: bromoOwners } = await supabase
-        .from('owners_bromo')
-        .select('id, name')
-
-      // Also load main teams to map from team abbr to main owner_id for awards lookup
-      const { data: mainTeams } = await supabase
-        .from('teams')
-        .select('abbr, owner_id')
-        .eq('active', true)
-
-      const bromoTeamLookup = {}
-      const bromoOwnerLookup = {}
-      const mainTeamToOwnerLookup = {}
-      
-      bromoTeams?.forEach(team => {
-        bromoTeamLookup[team.abbr] = team
-      })
-      
-      bromoOwners?.forEach(owner => {
-        bromoOwnerLookup[owner.id] = owner
-      })
-
-      mainTeams?.forEach(team => {
-        mainTeamToOwnerLookup[team.abbr] = team.owner_id
-      })
-
-      // Load games first and get the gameState directly
-      console.log('Loading games...')
-      const currentGameState = await loadGames()
-      console.log('Games loaded, gameState keys:', Object.keys(currentGameState))
-      
-      // Then load probabilities and get them directly
-      console.log('Loading probabilities...')
-      const currentProbabilities = await loadProbabilities(bromoTeams, currentGameState)
-      console.log('Probabilities loaded:', currentProbabilities)
-      console.log('About to build processed games with probabilities:', Object.keys(currentProbabilities || {}))
-
-      // Process team stats for this week
+      // 7. Initialize team stats for bromo teams only
+      console.log('=== PROCESSING BROMO TEAM STATS ===')
       const teamStats = {}
-      bromoTeams?.forEach(team => {
-        const owner = bromoOwnerLookup[team.owner_id]
-        if (!owner) return
+      
+      teams.forEach(team => {
+        const owner = ownerLookup[team.owner_id]
+        if (!owner) {
+          console.warn(`No bromo owner found for team ${team.abbr}`)
+          return
+        }
 
         teamStats[team.abbr] = {
           abbr: team.abbr,
@@ -239,21 +282,27 @@ export default function BromoScoreboard() {
           ownerName: owner.name,
           earnings: 0,
           hasWin: false,
-          hasOBO: false,
-          hasDBO: false
+          oboCount: 0,
+          dboCount: 0
         }
       })
-
-      // Process awards for this week - map through team abbr since awards have main league owner_ids
-      awards?.forEach(award => {
-        const bromoTeam = bromoTeamLookup[award.team_abbr]
-        if (!bromoTeam) return // Skip if this team isn't in bromo league
-
+      
+      console.log('Initialized stats for', Object.keys(teamStats).length, 'bromo teams')
+      
+      // 8. Process awards - only count awards for teams that have bromo owners
+      console.log('=== PROCESSING AWARDS FOR BROMO TEAMS ===')
+      awards.forEach(award => {
         const team = teamStats[award.team_abbr]
-        if (!team) return
+        if (!team) {
+          // This team is not owned by a bromo owner, skip
+          console.log(`Skipping award for non-bromo team: ${award.team_abbr}`)
+          return
+        }
 
         const points = award.points || 1
         const earnings = points * 5
+        
+        console.log(`Processing bromo award: ${award.type} for ${award.team_abbr} = ${earnings} earnings`)
         
         team.earnings += earnings
 
@@ -261,63 +310,56 @@ export default function BromoScoreboard() {
           case 'WIN':
           case 'TIE_AWAY':
             team.hasWin = true
+            console.log(`  ${award.team_abbr} marked as having win`)
             break
           case 'OBO':
-            team.hasOBO = true
+            team.oboCount += 1
+            console.log(`  ${award.team_abbr} OBO count: ${team.oboCount}`)
             break
           case 'DBO':
-            team.hasDBO = true
+            team.dboCount += 1
+            console.log(`  ${award.team_abbr} DBO count: ${team.dboCount}`)
             break
+          default:
+            console.log(`  Unknown award type: ${award.type}`)
         }
       })
-
-      // Add wins from completed games (using currentGameState)
+      
+      // 9. Add wins from completed games - only for bromo teams
+      console.log('=== ADDING GAME WINS FOR BROMO TEAMS ===')
       Object.entries(currentGameState).forEach(([teamAbbr, game]) => {
         if (game.status === 'STATUS_FINAL') {
           const team = teamStats[teamAbbr]
-          if (!team) return // Skip if team not in bromo league
+          if (!team) return // Not a bromo team
 
           const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
           
           if (isWin && !team.hasWin) {
             team.earnings += 5
             team.hasWin = true
+            console.log(`Added game win for bromo team ${teamAbbr}: +$5`)
           }
         }
       })
-
-      // Build games array for display - only include games where both teams are in bromo
-      console.log('Starting to build processed games array...')
-      const { data: gamesData } = await supabase
-        .from('games')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
-
-      console.log('Retrieved games data for processing:', gamesData?.length, 'games')
+      
+      // 10. Build games array for display - only show games involving bromo teams
+      console.log('=== BUILDING BROMO GAMES DISPLAY ===')
       const processedGames = []
       if (gamesData) {
-        console.log('Processing games with currentGameState keys:', Object.keys(currentGameState || {}).length, 'teams')
-        console.log('Processing games with currentProbabilities keys:', Object.keys(currentProbabilities || {}).length, 'teams')
-        
         gamesData.forEach(game => {
+          // Check if either team is owned by a bromo owner
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
           
-          // Only include games where both teams are in the bromo league
-          if (!homeTeam || !awayTeam) return
-
-          // Get the game results from currentGameState
+          // Only include games where at least one team is bromo-owned
+          if (!homeTeam && !awayTeam) {
+            return // Neither team is bromo-owned, skip this game
+          }
+          
           const homeGameState = currentGameState[game.home]
           const awayGameState = currentGameState[game.away]
-
-          // Use the probabilities we just loaded
           const homeProb = currentProbabilities[game.home] || null
           const awayProb = currentProbabilities[game.away] || null
-          
-          console.log(`Bromo Game ${game.home} vs ${game.away}:`)
-          console.log(`  Home result: ${homeGameState?.result}, Away result: ${awayGameState?.result}`)
-          console.log(`  Home prob: ${homeProb?.winProbability}, Away prob: ${awayProb?.winProbability}`)
 
           processedGames.push({
             id: `${game.home}-${game.away}`,
@@ -329,49 +371,58 @@ export default function BromoScoreboard() {
             awayScore: game.away_pts,
             homeResult: homeGameState?.result,
             awayResult: awayGameState?.result,
-            homeOwner: homeTeam?.ownerName || 'Unknown',
-            awayOwner: awayTeam?.ownerName || 'Unknown',
+            homeOwner: homeTeam?.ownerName || 'Non-Bromo',
+            awayOwner: awayTeam?.ownerName || 'Non-Bromo',
             homeEarnings: homeTeam?.earnings || 0,
             awayEarnings: awayTeam?.earnings || 0,
             homeWin: homeTeam?.hasWin || false,
             awayWin: awayTeam?.hasWin || false,
-            homeOBO: homeTeam?.oboCount > 0 || false,
-            awayOBO: awayTeam?.oboCount > 0 || false,
-            homeDBO: homeTeam?.dboCount > 0 || false,
-            awayDBO: awayTeam?.dboCount > 0 || false,
-            // Use the probabilities directly from the API call
+            homeOBO: (homeTeam?.oboCount || 0) > 0,
+            awayOBO: (awayTeam?.oboCount || 0) > 0,
+            homeDBO: (homeTeam?.dboCount || 0) > 0,
+            awayDBO: (awayTeam?.dboCount || 0) > 0,
             homeProb: homeProb,
-            awayProb: awayProb
+            awayProb: awayProb,
+            isBromoGame: !!(homeTeam && awayTeam) // Both teams are bromo-owned
           })
         })
       }
 
-      // Sort games by kickoff time
       processedGames.sort((a, b) => {
         if (!a.kickoff && !b.kickoff) return 0
         if (!a.kickoff) return 1
         if (!b.kickoff) return -1
         return new Date(a.kickoff) - new Date(b.kickoff)
       })
-
-      // Calculate owner totals
+      
+      // 11. Calculate bromo owner totals
+      console.log('=== CALCULATING BROMO OWNER TOTALS ===')
       const ownerTotals = {}
+      
       Object.values(teamStats).forEach(team => {
         if (!ownerTotals[team.ownerId]) {
           ownerTotals[team.ownerId] = {
             id: team.ownerId,
             name: team.ownerName,
-            total: 0
+            total: 0,
+            oboCount: 0,
+            dboCount: 0
           }
         }
         ownerTotals[team.ownerId].total += team.earnings
+        ownerTotals[team.ownerId].oboCount += team.oboCount
+        ownerTotals[team.ownerId].dboCount += team.dboCount
+      })
+      
+      // Log final bromo owner totals
+      Object.values(ownerTotals).forEach(owner => {
+        if (owner.oboCount > 0 || owner.dboCount > 0 || owner.total > 0) {
+          console.log(`Bromo ${owner.name}: $${owner.total} (OBO: ${owner.oboCount}, DBO: ${owner.dboCount})`)
+        }
       })
 
-      // Sort owners by earnings
-      const sortedOwners = Object.values(ownerTotals)
-        .sort((a, b) => b.total - a.total)
-
-      // Add ranks
+      const sortedOwners = Object.values(ownerTotals).sort((a, b) => b.total - a.total)
+      
       let currentRank = 1
       sortedOwners.forEach((owner, index) => {
         if (index > 0 && owner.total < sortedOwners[index - 1].total) {
@@ -383,9 +434,12 @@ export default function BromoScoreboard() {
       setOwnerRankings(sortedOwners)
       setGames(processedGames)
       setLoading(false)
-      console.log('=== BROMO LOADDATA COMPLETE ===')
+      
+      console.log('=== BROMO SCOREBOARD DATA LOAD COMPLETE ===')
+      console.log('Final results:', sortedOwners.length, 'bromo owners,', processedGames.length, 'games')
+      
     } catch (error) {
-      console.error('Error loading bromo data:', error)
+      console.error('Error in bromo loadData:', error)
       setLoading(false)
     }
   }
@@ -407,14 +461,17 @@ export default function BromoScoreboard() {
     }
   }
 
-  // FIXED getGameStatusDisplay function
   const getGameStatusDisplay = (game, isHome) => {
     const result = isHome ? game.homeResult : game.awayResult
     const prob = isHome ? game.homeProb : game.awayProb
+    const owner = isHome ? game.homeOwner : game.awayOwner
 
-    // Final games - show check or X emoji
+    // Don't show status for non-bromo teams
+    if (owner === 'Non-Bromo') {
+      return <span className="text-gray-400 text-xs">—</span>
+    }
+
     if (game.status === 'STATUS_FINAL') {
-      // For final games, check if this team won or if it's an away tie
       if (result === 'win' || (result === 'tie' && !isHome)) {
         return <span className="text-green-600">✅</span>
       } else {
@@ -422,7 +479,6 @@ export default function BromoScoreboard() {
       }
     }
 
-    // For in-progress or scheduled games, show probability if available
     if (prob && prob.winProbability !== undefined) {
       const winProb = prob.winProbability
       const percentage = (winProb * 100).toFixed(0)
@@ -456,13 +512,12 @@ export default function BromoScoreboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow border-b">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center">
             <div className="flex justify-between items-center mb-4">
               <a
-                href="/bromo"
+                href="/bromos"
                 className="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center space-x-1"
               >
                 <span>←</span>
@@ -496,7 +551,6 @@ export default function BromoScoreboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Owner Rankings */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Bromo Rankings</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -517,8 +571,14 @@ export default function BromoScoreboard() {
                       #{owner.rank} {owner.name}
                     </div>
                   </div>
-                  <div className="text-xl font-bold text-green-600">
-                    ${owner.total}
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-green-600">
+                      {/* Only show goose egg if week is finished and owner scored zero */}
+                      {weekFinished && owner.total === 0 && <span>🥚</span>}
+                      {(owner.oboCount || 0) > 0 && <span>🔥</span>}
+                      {(owner.dboCount || 0) > 0 && <span>🛡️</span>}
+                      ${owner.total}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -526,12 +586,13 @@ export default function BromoScoreboard() {
           </div>
         </div>
 
-        {/* Games */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Bromo Games</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {games.map((game) => (
-              <div key={game.id} className="bg-white rounded-lg border shadow p-3">
+              <div key={game.id} className={`bg-white rounded-lg border shadow p-3 ${
+                game.isBromoGame ? 'border-blue-300 bg-blue-50' : ''
+              }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-semibold text-gray-700">
                     {formatGameTime(game.kickoff)}
@@ -545,7 +606,6 @@ export default function BromoScoreboard() {
                 </div>
 
                 <div className="space-y-2">
-                  {/* Away Team */}
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
@@ -558,12 +618,18 @@ export default function BromoScoreboard() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-xs text-gray-900 truncate">@ {game.awayTeam}</div>
-                        <div className="text-xs text-gray-600 truncate">{game.awayOwner}</div>
+                        <div className={`text-xs truncate ${
+                          game.awayOwner === 'Non-Bromo' ? 'text-gray-400 italic' : 'text-gray-600'
+                        }`}>
+                          {game.awayOwner}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>
+                        <div className="font-bold text-green-600 text-xs">
+                          {game.awayOwner !== 'Non-Bromo' ? `$${game.awayEarnings}` : '—'}
+                        </div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {getGameStatusDisplay(game, false)}
                           {game.awayOBO && <span>🔥</span>}
@@ -578,7 +644,6 @@ export default function BromoScoreboard() {
                     </div>
                   </div>
 
-                  {/* Home Team */}
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
@@ -591,12 +656,18 @@ export default function BromoScoreboard() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-xs text-gray-900 truncate">{game.homeTeam}</div>
-                        <div className="text-xs text-gray-600 truncate">{game.homeOwner}</div>
+                        <div className={`text-xs truncate ${
+                          game.homeOwner === 'Non-Bromo' ? 'text-gray-400 italic' : 'text-gray-600'
+                        }`}>
+                          {game.homeOwner}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-xs">${game.homeEarnings}</div>
+                        <div className="font-bold text-green-600 text-xs">
+                          {game.homeOwner !== 'Non-Bromo' ? `$${game.homeEarnings}` : '—'}
+                        </div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {getGameStatusDisplay(game, true)}
                           {game.homeOBO && <span>🔥</span>}
@@ -619,7 +690,7 @@ export default function BromoScoreboard() {
         {games.length === 0 && (
           <div className="text-center py-12">
             <h2 className="text-2xl font-bold text-gray-700 mb-2">No Bromo Games Yet</h2>
-            <p className="text-gray-600">No games with bromo teams for Week {selectedWeek}</p>
+            <p className="text-gray-600">No games involving bromo teams for Week {selectedWeek}</p>
           </div>
         )}
       </div>
