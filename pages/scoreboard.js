@@ -1,29 +1,22 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-export default function ScoreboardBromo() {
+export default function Scoreboard() {
   const [weeklyScores, setWeeklyScores] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
   const [currentWeek, setCurrentWeek] = useState(2)
   const [selectedWeek, setSelectedWeek] = useState(2)
-  const [games, setGames] = useState({})
 
   useEffect(() => {
     loadCurrentWeek()
   }, [])
 
-useEffect(() => {
-  if (currentSeason && selectedWeek) {
-    // Add a small delay to ensure state is properly set
-    const timer = setTimeout(() => {
+  useEffect(() => {
+    if (currentSeason && selectedWeek) {
       loadWeeklyData()
-    }, 50)
-    
-    return () => clearTimeout(timer)
-  }
-}, [currentSeason, selectedWeek])
-  
+    }
+  }, [currentSeason, selectedWeek])
 
   async function loadCurrentWeek() {
     try {
@@ -40,16 +33,31 @@ useEffect(() => {
     }
   }
 
-  async function loadGames() {
+  async function loadWeeklyData() {
+    setLoading(true)
     try {
-      const { data: gamesData, error } = await supabase
-        .from('games')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
+      console.log('Loading data for season:', currentSeason, 'week:', selectedWeek)
+      
+      // Load all data in parallel
+      const [gamesResponse, awardsResponse, teamsResponse, ownersResponse] = await Promise.all([
+        supabase.from('games').select('*').eq('season', currentSeason).eq('week', selectedWeek),
+        supabase.from('awards').select('*').eq('season', currentSeason).eq('week', selectedWeek),
+        supabase.from('teams').select('abbr, name, owner_id').eq('active', true),
+        supabase.from('owners').select('id, name')
+      ])
 
-      if (!error && gamesData) {
-        const gameMap = {}
+      const { data: gamesData } = gamesResponse
+      const { data: awards } = awardsResponse
+      const { data: teams } = teamsResponse
+      const { data: owners } = ownersResponse
+
+      console.log('Games data:', gamesData?.length, 'games')
+      console.log('Awards data:', awards?.length, 'awards')
+      console.log('Teams data:', teams?.length, 'teams')
+
+      // Process games data locally
+      const gamesMap = {}
+      if (gamesData) {
         gamesData.forEach(game => {
           const getResult = (isHome, status, homeScore, awayScore) => {
             if (status !== 'STATUS_FINAL') return null
@@ -60,177 +68,38 @@ useEffect(() => {
             return 'tie'
           }
 
-          gameMap[game.home] = {
+          gamesMap[game.home] = {
             opponent: game.away,
             isHome: true,
             status: game.status,
             result: getResult(true, game.status, game.home_pts, game.away_pts)
           }
-          gameMap[game.away] = {
+          gamesMap[game.away] = {
             opponent: game.home,
             isHome: false,
             status: game.status,
             result: getResult(false, game.status, game.home_pts, game.away_pts)
           }
         })
-        setGames(gameMap)
       }
-    } catch (error) {
-      console.error('Error loading games:', error)
-    }
-  }
 
-async function loadWeeklyData() {
-  setLoading(true)
-  try {
-    // Load games for the week first and wait for it to complete
-    await loadGames()
+      console.log('Processed games:', Object.keys(gamesMap).length)
 
-    // Load awards for the selected week
-    const { data: awards } = await supabase
-      .from('awards')
-      .select('*')
-      .eq('season', currentSeason)
-      .eq('week', selectedWeek)
-
-    // Load teams and owners
-    const { data: teams } = await supabase
-      .from('teams') // or 'teams_bromo' for bromo version
-      .select('abbr, name, owner_id')
-      .eq('active', true)
-
-    const { data: owners } = await supabase
-      .from('owners') // or 'owners_bromo' for bromo version
-      .select('id, name')
-
-    // Wait a small moment to ensure games state is updated
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    const teamLookup = {}
-    const ownerLookup = {}
-    
-    teams?.forEach(team => {
-      teamLookup[team.abbr] = team
-    })
-    
-    owners?.forEach(owner => {
-      ownerLookup[owner.id] = owner
-    })
+      const teamLookup = {}
+      const ownerLookup = {}
+      
+      teams?.forEach(team => {
+        teamLookup[team.abbr] = team
+      })
+      
+      owners?.forEach(owner => {
+        ownerLookup[owner.id] = owner
+      })
 
       // Process weekly scores
       const ownerWeeklyStats = {}
 
-      // Initialize all owners
-      owners?.forEach(owner => {
-        ownerWeeklyStats[owner.id] = {
-          id: owner.id,
-          name: owner.name,
-          weeklyEarnings: 0,
-          teams: []
-        }
-      })
-
-      // Process awards for this week
-      awards?.forEach(award => {
-        const team = teamLookup[award.team_abbr]
-        if (!team) return
-
-        const ownerId = award.owner_id || team.owner_id
-        const owner = ownerLookup[ownerId]
-        if (!owner) return
-
-        const points = award.points || 1
-        const earnings = points * 5
-
-        if (!ownerWeeklyStats[ownerId]) {
-          ownerWeeklyStats[ownerId] = {
-            id: ownerId,
-            name: owner.name,
-            weeklyEarnings: 0,
-            teams: []
-          }
-        }
-
-        ownerWeeklyStats[ownerId].weeklyEarnings += earnings
-
-        // Find or create team entry
-        let teamEntry = ownerWeeklyStats[ownerId].teams.find(t => t.abbr === award.team_abbr)
-        if (!teamEntry) {
-          teamEntry = {
-            abbr: award.team_abbr,
-            name: team.name,
-            earnings: 0,
-            awards: []
-          }
-          ownerWeeklyStats[ownerId].teams.push(teamEntry)
-        }
-
-        teamEntry.earnings += earnings
-        teamEntry.awards.push({
-          type: award.type,
-          points: points,
-          earnings: earnings
-        })
-      })
-
-      // Add wins from completed games that aren't in awards table yet
-      Object.entries(games).forEach(([teamAbbr, game]) => {
-        if (game.status === 'STATUS_FINAL') {
-          const team = teamLookup[teamAbbr]
-          if (!team) return
-
-          // Check if this team won
-          const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
-          
-          if (isWin) {
-            // Check if we already have a WIN award for this team this week
-            const existingWinAward = awards?.find(award => 
-              award.team_abbr === teamAbbr && 
-              (award.type === 'WIN' || award.type === 'TIE_AWAY')
-            )
-
-            if (!existingWinAward) {
-              // Add the win to our display
-              const ownerId = team.owner_id
-              const owner = ownerLookup[ownerId]
-              if (!owner) return
-
-              const earnings = 5 // $5 for a win
-
-              if (!ownerWeeklyStats[ownerId]) {
-                ownerWeeklyStats[ownerId] = {
-                  id: ownerId,
-                  name: owner.name,
-                  weeklyEarnings: 0,
-                  teams: []
-                }
-              }
-
-              ownerWeeklyStats[ownerId].weeklyEarnings += earnings
-
-              let teamEntry = ownerWeeklyStats[ownerId].teams.find(t => t.abbr === teamAbbr)
-              if (!teamEntry) {
-                teamEntry = {
-                  abbr: teamAbbr,
-                  name: team.name,
-                  earnings: 0,
-                  awards: []
-                }
-                ownerWeeklyStats[ownerId].teams.push(teamEntry)
-              }
-
-              teamEntry.earnings += earnings
-              teamEntry.awards.push({
-                type: game.result === 'tie' ? 'TIE_AWAY' : 'WIN',
-                points: 1,
-                earnings: earnings
-              })
-            }
-          }
-        }
-      })
-
-      // Add teams with no awards but ensure they show up
+      // Initialize all owners with their teams
       teams?.forEach(team => {
         const owner = ownerLookup[team.owner_id]
         if (!owner) return
@@ -244,27 +113,92 @@ async function loadWeeklyData() {
           }
         }
 
-        const hasTeamEntry = ownerWeeklyStats[team.owner_id].teams.find(t => t.abbr === team.abbr)
-        if (!hasTeamEntry) {
-          ownerWeeklyStats[team.owner_id].teams.push({
-            abbr: team.abbr,
-            name: team.name,
-            earnings: 0,
-            awards: []
+        ownerWeeklyStats[team.owner_id].teams.push({
+          abbr: team.abbr,
+          name: team.name,
+          earnings: 0,
+          awards: []
+        })
+      })
+
+      console.log('Initialized owner stats for', Object.keys(ownerWeeklyStats).length, 'owners')
+
+      // Process awards for this week
+      awards?.forEach(award => {
+        const team = teamLookup[award.team_abbr]
+        if (!team) return
+
+        const ownerId = award.owner_id || team.owner_id
+        const owner = ownerLookup[ownerId]
+        if (!owner || !ownerWeeklyStats[ownerId]) return
+
+        const points = award.points || 1
+        const earnings = points * 5
+
+        ownerWeeklyStats[ownerId].weeklyEarnings += earnings
+
+        let teamEntry = ownerWeeklyStats[ownerId].teams.find(t => t.abbr === award.team_abbr)
+        if (teamEntry) {
+          teamEntry.earnings += earnings
+          teamEntry.awards.push({
+            type: award.type,
+            points: points,
+            earnings: earnings
           })
+        }
+
+        console.log(`Added award: ${award.team_abbr} ${award.type} $${earnings}`)
+      })
+
+      // Add wins from completed games using the local gamesMap
+      Object.entries(gamesMap).forEach(([teamAbbr, game]) => {
+        if (game.status === 'STATUS_FINAL') {
+          const team = teamLookup[teamAbbr]
+          if (!team) return
+
+          const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
+          
+          if (isWin) {
+            // Check if we already have a WIN award for this team this week
+            const existingWinAward = awards?.find(award => 
+              award.team_abbr === teamAbbr && 
+              (award.type === 'WIN' || award.type === 'TIE_AWAY')
+            )
+
+            if (!existingWinAward) {
+              const ownerId = team.owner_id
+              const owner = ownerLookup[ownerId]
+              if (!owner || !ownerWeeklyStats[ownerId]) return
+
+              const earnings = 5
+
+              ownerWeeklyStats[ownerId].weeklyEarnings += earnings
+
+              let teamEntry = ownerWeeklyStats[ownerId].teams.find(t => t.abbr === teamAbbr)
+              if (teamEntry) {
+                teamEntry.earnings += earnings
+                teamEntry.awards.push({
+                  type: game.result === 'tie' ? 'TIE_AWAY' : 'WIN',
+                  points: 1,
+                  earnings: earnings
+                })
+              }
+
+              console.log(`Added game win: ${teamAbbr} earned $${earnings}`)
+            }
+          }
         }
       })
 
-      // Sort owners by weekly earnings, then teams by earnings
-      // Handle ties properly in ranking
+      // Sort teams within each owner by earnings
+      Object.values(ownerWeeklyStats).forEach(owner => {
+        owner.teams.sort((a, b) => b.earnings - a.earnings)
+      })
+
+      // Sort owners by weekly earnings and assign ranks
       const sortedScores = Object.values(ownerWeeklyStats)
         .sort((a, b) => b.weeklyEarnings - a.weeklyEarnings)
-        .map(owner => ({
-          ...owner,
-          teams: owner.teams.sort((a, b) => b.earnings - a.earnings)
-        }))
 
-      // Assign ranks properly handling ties
       let currentRank = 1
       sortedScores.forEach((owner, index) => {
         if (index > 0 && owner.weeklyEarnings < sortedScores[index - 1].weeklyEarnings) {
@@ -272,6 +206,8 @@ async function loadWeeklyData() {
         }
         owner.rank = currentRank
       })
+
+      console.log('Final sorted scores:', sortedScores.map(o => `${o.name}: $${o.weeklyEarnings}`))
 
       setWeeklyScores(sortedScores)
       setLoading(false)
@@ -322,9 +258,19 @@ async function loadWeeklyData() {
       <div className="bg-white shadow-lg border-b-4 border-blue-500">
         <div className="container mx-auto px-4 py-4">
           <div className="text-center">
-            <h1 className="text-2xl font-black text-blue-800 mb-3">
-              📊 SCOREBOARD
-            </h1>
+            <div className="flex justify-between items-center mb-3">
+              <a
+                href="/"
+                className="text-blue-600 hover:text-blue-800 font-bold text-sm flex items-center space-x-1"
+              >
+                <span>←</span>
+                <span>Back to League</span>
+              </a>
+              <h1 className="text-2xl font-black text-blue-800">
+                📊 SCOREBOARD
+              </h1>
+              <div className="w-20"></div> {/* Spacer for centering */}
+            </div>
             
             {/* Week Selector */}
             <div className="flex justify-center items-center space-x-2 mb-2">
@@ -354,7 +300,7 @@ async function loadWeeklyData() {
 
       {/* Scoreboard */}
       <div className="container mx-auto px-4 py-6 space-y-4">
-        {weeklyScores.map((owner, index) => (
+        {weeklyScores.map((owner) => (
           <div
             key={owner.id}
             className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${
@@ -384,9 +330,6 @@ async function loadWeeklyData() {
             <div className="p-4">
               <div className="space-y-3">
                 {owner.teams.map(team => {
-                  const game = games[team.abbr]
-                  const isGameComplete = game?.status === 'STATUS_FINAL'
-                  
                   return (
                     <div key={team.abbr} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
                       <div className="flex items-center space-x-3 flex-1">
@@ -400,20 +343,6 @@ async function loadWeeklyData() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-bold text-gray-800">{team.abbr}</div>
-                          {game && (
-                            <div className="text-xs text-gray-500">
-                              {game.isHome ? 'vs' : '@'} {game.opponent}
-                              {isGameComplete && (
-                                <span className={`ml-2 ${
-                                  game.result === 'win' ? 'text-green-600' : 
-                                  game.result === 'tie' && !game.isHome ? 'text-green-600' : 'text-red-600'
-                                }`}>
-                                  {game.result === 'win' ? '✅' : 
-                                   game.result === 'tie' && !game.isHome ? '✅' : '❌'}
-                                </span>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                       
