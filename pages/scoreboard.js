@@ -504,8 +504,12 @@ export default function Scoreboard() {
                       #{owner.rank} {owner.name}
                     </div>
                   </div>
-                  <div className="text-xl font-bold text-green-600">
-                    ${owner.total}
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-green-600">
+                      {(owner.oboCount || 0) > 0 && <span>🔥</span>}
+                      {(owner.dboCount || 0) > 0 && <span>🛡️</span>}
+                      ${owner.total}
+                    </div>
                   </div>
                 </div>
               </div>
