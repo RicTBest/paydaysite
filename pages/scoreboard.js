@@ -9,6 +9,7 @@ export default function Scoreboard() {
   const [currentWeek, setCurrentWeek] = useState(2)
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [probabilities, setProbabilities] = useState({})
+  const [gameState, setGameState] = useState({}) // For the bye week logic
 
   useEffect(() => {
     loadCurrentWeek()
@@ -16,7 +17,9 @@ export default function Scoreboard() {
     // Set up auto-refresh every 1 minute
     const interval = setInterval(() => {
       console.log('Auto-refreshing scoreboard data...')
-      loadWeeklyData()
+      if (currentSeason && selectedWeek) {
+        loadData()
+      }
     }, 60 * 1000) // 1 minute
 
     return () => {
@@ -26,72 +29,154 @@ export default function Scoreboard() {
 
   useEffect(() => {
     if (currentSeason && selectedWeek) {
-      loadWeeklyData()
+      loadData()
     }
   }, [currentSeason, selectedWeek])
 
+  // EXACT copy from index.js
   async function loadCurrentWeek() {
+    console.log('Loading current week...')
     try {
       const response = await fetch('/api/current-week')
       if (response.ok) {
         const data = await response.json()
+        console.log('Current week API response:', data)
         setCurrentSeason(data.season)
         setCurrentWeek(data.week)
         setSelectedWeek(data.week)
+        
+        // Wait for state to update, then load data
+        setTimeout(() => {
+          loadData()
+        }, 100)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
-      loadWeeklyData()
+      // Fallback to loading data anyway
+      loadData()
     }
   }
 
-  async function loadProbabilities() {
+  // EXACT copy from index.js
+  async function loadGames() {
+    console.log('=== STARTING LOADGAMES ===')
+    console.log('Current season:', currentSeason, 'Current week:', selectedWeek)
+    try {
+      const { data: gamesData, error: gamesError } = await supabase
+        .from('games')
+        .select('*')
+        .eq('season', currentSeason)
+        .eq('week', selectedWeek)
+
+      console.log('Games query completed. Error:', gamesError, 'Data count:', gamesData?.length)
+
+      if (!gamesError && gamesData && gamesData.length > 0) {
+        console.log('Processing', gamesData.length, 'games...')
+        const gameMap = {}
+        
+        gamesData.forEach((game, index) => {
+          console.log(`Game ${index + 1}: ${game.home} vs ${game.away}, status: ${game.status}`)
+          
+          const getGameResult = (isHome, status, homeScore, awayScore) => {
+            if (status !== 'STATUS_FINAL') return null
+            
+            const myScore = isHome ? homeScore : awayScore
+            const theirScore = isHome ? awayScore : homeScore
+            
+            if (myScore > theirScore) return 'win'
+            if (myScore < theirScore) return 'loss'
+            return 'tie'
+          }
+          
+          const homeResult = getGameResult(true, game.status, game.home_pts, game.away_pts)
+          const awayResult = getGameResult(false, game.status, game.home_pts, game.away_pts)
+          
+          gameMap[game.home] = {
+            opponent: game.away,
+            isHome: true,
+            status: game.status,
+            result: homeResult
+          }
+          
+          gameMap[game.away] = {
+            opponent: game.home,
+            isHome: false,
+            status: game.status,
+            result: awayResult
+          }
+        })
+        
+        console.log('Final game map:', gameMap)
+        setGameState(gameMap) // For probability logic
+        console.log('Games state updated!')
+      } else {
+        console.log('No games data available - clearing games state')
+        setGameState({})
+      }
+    } catch (error) {
+      console.log('Error in loadGames:', error)
+    }
+  }
+
+  // EXACT copy from index.js
+  async function loadProbabilities(teams) {
     try {
       const response = await fetch(`/api/kalshi-probabilities?week=${selectedWeek}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        setProbabilities(data.probabilities || {})
+        console.log(`Loading probabilities for Week ${selectedWeek}:`, data.probabilities)
+        
+        // Set probability to 0 for teams without games (bye weeks)
+        const adjustedProbabilities = { ...data.probabilities }
+        
+        teams?.forEach(team => {
+          if (!gameState[team.abbr] && !adjustedProbabilities[team.abbr]) {
+            adjustedProbabilities[team.abbr] = { winProbability: 0, confidence: 'bye_week' }
+          }
+        })
+        
+        setProbabilities(adjustedProbabilities || {})
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
-      setProbabilities({})
     }
   }
 
-  async function loadWeeklyData() {
-    setLoading(true)
+  // Based on index.js loadData but simplified for scoreboard
+  async function loadData() {
+    console.log('=== STARTING LOADDATA ===')
+    console.log('Season:', currentSeason, 'Week:', selectedWeek)
     try {
-      console.log('Loading data for season:', currentSeason, 'week:', selectedWeek)
+      setLoading(true)
       
-      // Load all data in parallel FIRST
-      const [gamesResponse, awardsResponse, teamsResponse, ownersResponse] = await Promise.all([
-        supabase.from('games').select('*').eq('season', currentSeason).eq('week', selectedWeek),
-        supabase.from('awards').select('*').eq('season', currentSeason).eq('week', selectedWeek),
-        supabase.from('teams').select('abbr, name, owner_id').eq('active', true),
-        supabase.from('owners').select('id, name')
-      ])
+      // Load awards for the selected week
+      let awards = []
+      try {
+        const { data: awardsData, error } = await supabase
+          .from('awards')
+          .select('*')
+          .eq('season', currentSeason)
+          .eq('week', selectedWeek)
 
-      const { data: gamesData } = gamesResponse
-      const { data: awards } = awardsResponse
-      const { data: teams } = teamsResponse
-      const { data: owners } = ownersResponse
-
-      console.log('Games data:', gamesData?.length, 'games')
-      console.log('Awards data:', awards?.length, 'awards')
-      console.log('Teams data:', teams?.length, 'teams')
-
-      // Process games first to have games state available for probability logic
-      const tempGames = {}
-      if (gamesData) {
-        gamesData.forEach(game => {
-          tempGames[game.home] = { status: game.status }
-          tempGames[game.away] = { status: game.status }
-        })
+        if (error) {
+          console.warn('Awards table access denied - using empty data:', error)
+          awards = []
+        } else {
+          awards = awardsData || []
+        }
+      } catch (err) {
+        console.warn('Awards table error - using empty data:', err)
+        awards = []
       }
+      
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('abbr, name, owner_id')
+        .eq('active', true)
 
-      // NOW load probabilities with teams and games data available
-      const freshProbabilities = await loadProbabilities(teams)
-      console.log('Fresh probabilities loaded:', Object.keys(freshProbabilities).length, 'teams')
+      const { data: owners } = await supabase
+        .from('owners')
+        .select('id, name')
 
       const teamLookup = {}
       const ownerLookup = {}
@@ -104,7 +189,13 @@ export default function Scoreboard() {
         ownerLookup[owner.id] = owner
       })
 
-      // Process team stats
+      // Load games and probabilities in parallel (like index.js)
+      await Promise.all([
+        loadGames(),
+        loadProbabilities(teams)
+      ])
+
+      // Process team stats for this week
       const teamStats = {}
       teams?.forEach(team => {
         const owner = ownerLookup[team.owner_id]
@@ -122,13 +213,15 @@ export default function Scoreboard() {
         }
       })
 
-      // Process awards
+      // Process awards for this week
       awards?.forEach(award => {
         const team = teamStats[award.team_abbr]
         if (!team) return
 
+        const ownerId = award.owner_id || team.ownerId
         const points = award.points || 1
         const earnings = points * 5
+        
         team.earnings += earnings
 
         switch (award.type) {
@@ -145,47 +238,34 @@ export default function Scoreboard() {
         }
       })
 
-      // Process games and add missing wins
+      // Add wins from completed games (like index.js)
+      Object.entries(gameState).forEach(([teamAbbr, game]) => {
+        if (game.status === 'STATUS_FINAL') {
+          const team = teamStats[teamAbbr]
+          if (!team) return
+
+          const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
+          
+          if (isWin && !team.hasWin) {
+            team.earnings += 5
+            team.hasWin = true
+          }
+        }
+      })
+
+      // Build games array for display
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('*')
+        .eq('season', currentSeason)
+        .eq('week', selectedWeek)
+
       const processedGames = []
       if (gamesData) {
         gamesData.forEach(game => {
-          const getResult = (isHome, status, homeScore, awayScore) => {
-            if (status !== 'STATUS_FINAL') return null
-            const myScore = isHome ? homeScore : awayScore
-            const theirScore = isHome ? awayScore : homeScore
-            if (myScore > theirScore) return 'win'
-            if (myScore < theirScore) return 'loss'
-            return 'tie'
-          }
-
-          const homeResult = getResult(true, game.status, game.home_pts, game.away_pts)
-          const awayResult = getResult(false, game.status, game.home_pts, game.away_pts)
-
-          // Add missing wins
-          if (game.status === 'STATUS_FINAL') {
-            const homeTeam = teamStats[game.home]
-            const awayTeam = teamStats[game.away]
-            
-            const homeIsWin = homeResult === 'win'
-            const awayIsWin = awayResult === 'win' || (awayResult === 'tie')
-            
-            if (homeTeam && homeIsWin && !homeTeam.hasWin) {
-              homeTeam.earnings += 5
-              homeTeam.hasWin = true
-            }
-            if (awayTeam && awayIsWin && !awayTeam.hasWin) {
-              awayTeam.earnings += 5
-              awayTeam.hasWin = true
-            }
-          }
-
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
 
-          // Use the fresh probabilities directly
-          const homeProb = freshProbabilities[game.home]
-          const awayProb = freshProbabilities[game.away]
-          
           processedGames.push({
             id: `${game.home}-${game.away}`,
             kickoff: game.kickoff,
@@ -194,8 +274,8 @@ export default function Scoreboard() {
             awayTeam: game.away,
             homeScore: game.home_pts,
             awayScore: game.away_pts,
-            homeResult,
-            awayResult,
+            homeResult: gameState[game.home]?.result,
+            awayResult: gameState[game.away]?.result,
             homeOwner: homeTeam?.ownerName || 'Unknown',
             awayOwner: awayTeam?.ownerName || 'Unknown',
             homeEarnings: homeTeam?.earnings || 0,
@@ -206,14 +286,8 @@ export default function Scoreboard() {
             awayOBO: awayTeam?.hasOBO || false,
             homeDBO: homeTeam?.hasDBO || false,
             awayDBO: awayTeam?.hasDBO || false,
-            homeProb: homeProb,
-            awayProb: awayProb
-          })
-          
-          console.log(`Game ${game.home} vs ${game.away}:`, {
-            homeProb: homeProb ? `${(homeProb.winProbability * 100).toFixed(0)}%` : 'none',
-            awayProb: awayProb ? `${(awayProb.winProbability * 100).toFixed(0)}%` : 'none',
-            status: game.status
+            homeProb: probabilities[game.home],
+            awayProb: probabilities[game.away]
           })
         })
       }
@@ -255,15 +329,9 @@ export default function Scoreboard() {
       setOwnerRankings(sortedOwners)
       setGames(processedGames)
       setLoading(false)
-      
-      console.log('Final processed games with probabilities:', processedGames.length)
-      console.log('Sample game probs:', processedGames.slice(0, 2).map(g => ({
-        teams: `${g.awayTeam}@${g.homeTeam}`,
-        homeProb: g.homeProb,
-        awayProb: g.awayProb
-      })))
+      console.log('=== LOADDATA COMPLETE ===')
     } catch (error) {
-      console.error('Error loading weekly data:', error)
+      console.error('Error loading data:', error)
       setLoading(false)
     }
   }
@@ -289,7 +357,7 @@ export default function Scoreboard() {
     const result = isHome ? game.homeResult : game.awayResult
     const prob = isHome ? game.homeProb : game.awayProb
 
-    // Final games - show check or X emoji based on game result
+    // Final games - show check or X emoji
     if (game.status === 'STATUS_FINAL') {
       if (result === 'win' || (result === 'tie' && !isHome)) {
         return <span className="text-green-600">✅</span>
@@ -298,28 +366,22 @@ export default function Scoreboard() {
       }
     }
 
-    // Live probability display for ongoing and scheduled games (like index.js)
+    // Live probability display (match index.js showLiveProbability logic)
     if (prob && prob.confidence !== 'final') {
       const winProb = prob.winProbability
       const percentage = (winProb * 100).toFixed(0)
       
-      // Use same logic as your index.js showLiveProbability
-      const showLiveProbability = prob.confidence !== 'final' && game.status !== 'STATUS_FINAL'
-      
-      if (showLiveProbability) {
-        return (
-          <div className={`text-xs px-2 py-1 rounded-full font-bold shadow ${
-            winProb > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-            winProb > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
-            'bg-gradient-to-r from-red-500 to-red-600 text-white'
-          }`}>
-            {percentage}%
-          </div>
-        )
-      }
+      return (
+        <div className={`text-xs px-2 py-1 rounded-full font-bold shadow ${
+          winProb > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
+          winProb > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
+          'bg-gradient-to-r from-red-500 to-red-600 text-white'
+        }`}>
+          {percentage}%
+        </div>
+      )
     }
 
-    // Fallback for games without probability data
     return <span className="text-gray-400 text-xs">—</span>
   }
 
