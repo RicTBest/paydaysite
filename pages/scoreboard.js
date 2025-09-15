@@ -57,7 +57,7 @@ export default function Scoreboard() {
     }
   }
 
-  // Fixed loadGames function
+  // Fixed loadGames function that returns the gameState
   async function loadGames() {
     console.log('=== STARTING LOADGAMES ===')
     console.log('Current season:', currentSeason, 'Current week:', selectedWeek)
@@ -118,17 +118,20 @@ export default function Scoreboard() {
         console.log('Final game map:', gameMap)
         setGameState(gameMap)
         console.log('Games state updated!')
+        return gameMap // Return the gameMap directly
       } else {
         console.log('No games data available - clearing games state')
         setGameState({})
+        return {}
       }
     } catch (error) {
       console.log('Error in loadGames:', error)
+      return {}
     }
   }
 
-  // EXACT copy from index.js
-  async function loadProbabilities(teams) {
+  // Fixed loadProbabilities function that accepts gameState as parameter
+  async function loadProbabilities(teams, currentGameState = {}) {
     try {
       const response = await fetch(`/api/kalshi-probabilities?week=${selectedWeek}&season=${currentSeason}`)
       if (response.ok) {
@@ -139,15 +142,18 @@ export default function Scoreboard() {
         const adjustedProbabilities = { ...data.probabilities }
         
         teams?.forEach(team => {
-          if (!gameState[team.abbr] && !adjustedProbabilities[team.abbr]) {
+          if (!currentGameState[team.abbr] && !adjustedProbabilities[team.abbr]) {
             adjustedProbabilities[team.abbr] = { winProbability: 0, confidence: 'bye_week' }
           }
         })
         
         setProbabilities(adjustedProbabilities || {})
+        console.log('Probabilities set in state:', adjustedProbabilities)
+        return adjustedProbabilities // Return the probabilities
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
+      return {}
     }
   }
 
@@ -198,11 +204,16 @@ export default function Scoreboard() {
         ownerLookup[owner.id] = owner
       })
 
-      // Load games and probabilities in parallel (like index.js)
-      await Promise.all([
-        loadGames(),
-        loadProbabilities(teams)
-      ])
+      // Load games first and get the gameState directly
+      console.log('Loading games...')
+      const currentGameState = await loadGames()
+      console.log('Games loaded, gameState keys:', Object.keys(currentGameState))
+      
+      // Then load probabilities and get them directly
+      console.log('Loading probabilities...')
+      const currentProbabilities = await loadProbabilities(teams, currentGameState)
+      console.log('Probabilities loaded:', currentProbabilities)
+      console.log('About to build processed games with probabilities:', Object.keys(currentProbabilities || {}))
 
       // Process team stats for this week
       const teamStats = {}
@@ -247,8 +258,8 @@ export default function Scoreboard() {
         }
       })
 
-      // Add wins from completed games (like index.js)
-      Object.entries(gameState).forEach(([teamAbbr, game]) => {
+      // Add wins from completed games (using currentGameState)
+      Object.entries(currentGameState).forEach(([teamAbbr, game]) => {
         if (game.status === 'STATUS_FINAL') {
           const team = teamStats[teamAbbr]
           if (!team) return
@@ -273,16 +284,24 @@ export default function Scoreboard() {
       console.log('Retrieved games data for processing:', gamesData?.length, 'games')
       const processedGames = []
       if (gamesData) {
-        console.log('Processing games with currentGameState:', Object.keys(currentGameState).length, 'teams')
-        console.log('Processing games with currentProbabilities:', Object.keys(currentProbabilities || {}).length, 'teams')
+        console.log('Processing games with currentGameState keys:', Object.keys(currentGameState || {}).length, 'teams')
+        console.log('Processing games with currentProbabilities keys:', Object.keys(currentProbabilities || {}).length, 'teams')
         
         gamesData.forEach(game => {
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
           
-          // Get the game results from gameState
-          const homeGameState = gameState[game.home]
-          const awayGameState = gameState[game.away]
+          // Get the game results from currentGameState
+          const homeGameState = currentGameState[game.home]
+          const awayGameState = currentGameState[game.away]
+
+          // Use the probabilities we just loaded
+          const homeProb = currentProbabilities[game.home] || null
+          const awayProb = currentProbabilities[game.away] || null
+          
+          console.log(`Game ${game.home} vs ${game.away}:`)
+          console.log(`  Home result: ${homeGameState?.result}, Away result: ${awayGameState?.result}`)
+          console.log(`  Home prob: ${homeProb?.winProbability}, Away prob: ${awayProb?.winProbability}`)
 
           processedGames.push({
             id: `${game.home}-${game.away}`,
@@ -304,9 +323,9 @@ export default function Scoreboard() {
             awayOBO: awayTeam?.hasOBO || false,
             homeDBO: homeTeam?.hasDBO || false,
             awayDBO: awayTeam?.hasDBO || false,
-            // Fix: Access probabilities from the state, not the parameter
-            homeProb: probabilities[game.home] || null,
-            awayProb: probabilities[game.away] || null
+            // Use the probabilities directly from the API call
+            homeProb: homeProb,
+            awayProb: awayProb
           })
         })
       }
