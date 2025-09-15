@@ -43,7 +43,11 @@ export default function Scoreboard() {
         console.log('Current week API response:', data)
         setCurrentSeason(data.season)
         setCurrentWeek(data.week)
-        setSelectedWeek(data.week)
+        
+        // Only set selectedWeek if it's still the default (not manually changed)
+        if (selectedWeek === currentWeek || selectedWeek === 2) {
+          setSelectedWeek(data.week)
+        }
         
         // Wait for state to update, then load data
         setTimeout(() => {
