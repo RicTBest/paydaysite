@@ -63,11 +63,7 @@ export default function Scoreboard() {
     try {
       console.log('Loading data for season:', currentSeason, 'week:', selectedWeek)
       
-      // Load probabilities FIRST and get the return value
-      const freshProbabilities = await loadProbabilities()
-      console.log('Fresh probabilities loaded:', Object.keys(freshProbabilities).length, 'teams')
-      
-      // Load all other data in parallel
+      // Load all data in parallel FIRST
       const [gamesResponse, awardsResponse, teamsResponse, ownersResponse] = await Promise.all([
         supabase.from('games').select('*').eq('season', currentSeason).eq('week', selectedWeek),
         supabase.from('awards').select('*').eq('season', currentSeason).eq('week', selectedWeek),
@@ -83,6 +79,19 @@ export default function Scoreboard() {
       console.log('Games data:', gamesData?.length, 'games')
       console.log('Awards data:', awards?.length, 'awards')
       console.log('Teams data:', teams?.length, 'teams')
+
+      // Process games first to have games state available for probability logic
+      const tempGames = {}
+      if (gamesData) {
+        gamesData.forEach(game => {
+          tempGames[game.home] = { status: game.status }
+          tempGames[game.away] = { status: game.status }
+        })
+      }
+
+      // NOW load probabilities with teams and games data available
+      const freshProbabilities = await loadProbabilities(teams)
+      console.log('Fresh probabilities loaded:', Object.keys(freshProbabilities).length, 'teams')
 
       const teamLookup = {}
       const ownerLookup = {}
