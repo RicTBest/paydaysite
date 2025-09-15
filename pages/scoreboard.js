@@ -263,14 +263,19 @@ export default function Scoreboard() {
       })
 
       // Build games array for display - FIXED VERSION
+      console.log('Starting to build processed games array...')
       const { data: gamesData } = await supabase
         .from('games')
         .select('*')
         .eq('season', currentSeason)
         .eq('week', selectedWeek)
 
+      console.log('Retrieved games data for processing:', gamesData?.length, 'games')
       const processedGames = []
       if (gamesData) {
+        console.log('Processing games with currentGameState:', Object.keys(currentGameState).length, 'teams')
+        console.log('Processing games with currentProbabilities:', Object.keys(currentProbabilities || {}).length, 'teams')
+        
         gamesData.forEach(game => {
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
