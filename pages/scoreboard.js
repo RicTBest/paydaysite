@@ -514,6 +514,7 @@ export default function Scoreboard() {
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-bold text-green-600">
+                      {owner.total === 0 && <span>🥚</span>}
                       {(owner.oboCount || 0) > 0 && <span>🔥</span>}
                       {(owner.dboCount || 0) > 0 && <span>🛡️</span>}
                       ${owner.total}
