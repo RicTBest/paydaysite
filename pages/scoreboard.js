@@ -167,17 +167,20 @@ export default function Scoreboard() {
       // Load awards for the selected week
       let awards = []
       try {
+        console.log('Querying awards for season:', currentSeason, 'week:', selectedWeek)
         const { data: awardsData, error } = await supabase
           .from('awards')
           .select('*')
           .eq('season', currentSeason)
           .eq('week', selectedWeek)
 
+        console.log('Awards query result - Error:', error, 'Data:', awardsData)
         if (error) {
           console.warn('Awards table access denied - using empty data:', error)
           awards = []
         } else {
           awards = awardsData || []
+          console.log('Awards data loaded:', awards.length, 'awards found')
         }
       } catch (err) {
         console.warn('Awards table error - using empty data:', err)
