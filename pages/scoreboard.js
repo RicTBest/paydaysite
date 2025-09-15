@@ -9,18 +9,17 @@ export default function Scoreboard() {
   const [currentWeek, setCurrentWeek] = useState(2)
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [probabilities, setProbabilities] = useState({})
-  const [gameState, setGameState] = useState({}) // For the bye week logic
+  const [gameState, setGameState] = useState({})
 
   useEffect(() => {
     loadCurrentWeek()
     
-    // Set up auto-refresh every 1 minute
     const interval = setInterval(() => {
       console.log('Auto-refreshing scoreboard data...')
       if (currentSeason && selectedWeek) {
         loadData()
       }
-    }, 60 * 1000) // 1 minute
+    }, 60 * 1000)
 
     return () => {
       clearInterval(interval)
@@ -33,7 +32,6 @@ export default function Scoreboard() {
     }
   }, [currentSeason, selectedWeek])
 
-  // EXACT copy from index.js
   async function loadCurrentWeek() {
     console.log('Loading current week...')
     try {
@@ -49,22 +47,20 @@ export default function Scoreboard() {
           setSelectedWeek(data.week)
         }
         
-        // Wait for state to update, then load data
         setTimeout(() => {
           loadData()
         }, 100)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
-      // Fallback to loading data anyway
       loadData()
     }
   }
 
-  // Fixed loadGames function that returns the gameState
   async function loadGames() {
-    console.log('=== STARTING LOADGAMES ===')
-    console.log('Current season:', currentSeason, 'Current week:', selectedWeek)
+    console.log('=== LOADING GAMES ===')
+    console.log('Loading games for season:', currentSeason, 'week:', selectedWeek)
+    
     try {
       const { data: gamesData, error: gamesError } = await supabase
         .from('games')
@@ -72,77 +68,60 @@ export default function Scoreboard() {
         .eq('season', currentSeason)
         .eq('week', selectedWeek)
 
-      console.log('Games query completed. Error:', gamesError, 'Data count:', gamesData?.length)
+      console.log('Games query result - Error:', gamesError, 'Count:', gamesData?.length)
 
       if (!gamesError && gamesData && gamesData.length > 0) {
-        console.log('Processing', gamesData.length, 'games...')
         const gameMap = {}
         
         gamesData.forEach((game, index) => {
-          console.log(`Game ${index + 1}: ${game.home} vs ${game.away}, status: ${game.status}`)
-          console.log(`Scores: ${game.home} ${game.home_pts} - ${game.away} ${game.away_pts}`)
+          console.log(`Game ${index + 1}: ${game.home} ${game.home_pts} - ${game.away} ${game.away_pts} (${game.status})`)
           
-          const getGameResult = (isHome, status, homeScore, awayScore) => {
+          const getResult = (isHome, status, homeScore, awayScore) => {
             if (status !== 'STATUS_FINAL') return null
-            
             const myScore = isHome ? homeScore : awayScore
             const theirScore = isHome ? awayScore : homeScore
-            
-            console.log(`Calculating result for ${isHome ? 'home' : 'away'}: myScore=${myScore}, theirScore=${theirScore}`)
-            
-            if (myScore > theirScore) return 'win'
-            if (myScore < theirScore) return 'loss'
-            return 'tie'
+            return myScore > theirScore ? 'win' : myScore < theirScore ? 'loss' : 'tie'
           }
           
-          const homeResult = getGameResult(true, game.status, game.home_pts, game.away_pts)
-          const awayResult = getGameResult(false, game.status, game.home_pts, game.away_pts)
-          
-          console.log(`Results: ${game.home} = ${homeResult}, ${game.away} = ${awayResult}`)
+          const homeResult = getResult(true, game.status, game.home_pts, game.away_pts)
+          const awayResult = getResult(false, game.status, game.home_pts, game.away_pts)
           
           gameMap[game.home] = {
             opponent: game.away,
             isHome: true,
             status: game.status,
-            result: homeResult,
-            homeScore: game.home_pts,
-            awayScore: game.away_pts
+            result: homeResult
           }
           
           gameMap[game.away] = {
             opponent: game.home,
             isHome: false,
             status: game.status,
-            result: awayResult,
-            homeScore: game.home_pts,
-            awayScore: game.away_pts
+            result: awayResult
           }
         })
         
-        console.log('Final game map:', gameMap)
+        console.log('Game results processed:', Object.keys(gameMap).length, 'teams')
         setGameState(gameMap)
-        console.log('Games state updated!')
-        return gameMap // Return the gameMap directly
+        return gameMap
       } else {
-        console.log('No games data available - clearing games state')
+        console.log('No games found')
         setGameState({})
         return {}
       }
     } catch (error) {
-      console.log('Error in loadGames:', error)
+      console.error('Error loading games:', error)
       return {}
     }
   }
 
-  // Fixed loadProbabilities function that accepts gameState as parameter
   async function loadProbabilities(teams, currentGameState = {}) {
     try {
       const response = await fetch(`/api/kalshi-probabilities?week=${selectedWeek}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        console.log(`Loading probabilities for Week ${selectedWeek}:`, data.probabilities)
+        console.log(`Probabilities loaded for Week ${selectedWeek}:`, Object.keys(data.probabilities || {}).length, 'teams')
         
-        // Set probability to 0 for teams without games (bye weeks)
         const adjustedProbabilities = { ...data.probabilities }
         
         teams?.forEach(team => {
@@ -152,8 +131,7 @@ export default function Scoreboard() {
         })
         
         setProbabilities(adjustedProbabilities || {})
-        console.log('Probabilities set in state:', adjustedProbabilities)
-        return adjustedProbabilities // Return the probabilities
+        return adjustedProbabilities
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
@@ -161,72 +139,90 @@ export default function Scoreboard() {
     }
   }
 
-  // Based on index.js loadData but simplified for scoreboard
   async function loadData() {
-    console.log('=== STARTING LOADDATA ===')
-    console.log('Season:', currentSeason, 'Week:', selectedWeek)
+    console.log('=== STARTING SCOREBOARD DATA LOAD ===')
+    console.log('Season:', currentSeason, 'Selected Week:', selectedWeek)
+    
     try {
       setLoading(true)
       
-      // Load awards for the selected week
+      // 1. Load base data
+      const [teamsResult, ownersResult] = await Promise.all([
+        supabase.from('teams').select('abbr, name, owner_id').eq('active', true),
+        supabase.from('owners').select('id, name')
+      ])
+      
+      const teams = teamsResult.data || []
+      const owners = ownersResult.data || []
+      
+      console.log('Loaded base data:', teams.length, 'teams,', owners.length, 'owners')
+      
+      // 2. Create lookup maps
+      const teamLookup = {}
+      const ownerLookup = {}
+      
+      teams.forEach(team => {
+        teamLookup[team.abbr] = team
+      })
+      
+      owners.forEach(owner => {
+        ownerLookup[owner.id] = owner
+      })
+      
+      // 3. Load games and probabilities
+      const currentGameState = await loadGames()
+      const currentProbabilities = await loadProbabilities(teams, currentGameState)
+      
+      // 4. Load awards for the selected week
+      console.log('=== LOADING AWARDS ===')
+      console.log('Querying awards for season:', currentSeason, 'week:', selectedWeek)
+      
       let awards = []
       try {
-        console.log('Querying awards for season:', currentSeason, 'week:', selectedWeek)
         const { data: awardsData, error } = await supabase
           .from('awards')
           .select('*')
           .eq('season', currentSeason)
           .eq('week', selectedWeek)
 
-        console.log('Awards query result - Error:', error, 'Data:', awardsData)
+        console.log('Awards query result:')
+        console.log('  Error:', error)
+        console.log('  Raw data:', awardsData)
+        console.log('  Count:', awardsData?.length || 0)
+        
         if (error) {
-          console.warn('Awards table access denied - using empty data:', error)
+          console.warn('Awards query failed:', error)
           awards = []
         } else {
           awards = awardsData || []
-          console.log('Awards data loaded:', awards.length, 'awards found')
+          console.log('Successfully loaded', awards.length, 'awards')
+          
+          // Log each award for debugging
+          awards.forEach((award, index) => {
+            console.log(`Award ${index + 1}:`, {
+              type: award.type,
+              team: award.team_abbr,
+              points: award.points,
+              week: award.week,
+              season: award.season
+            })
+          })
         }
       } catch (err) {
-        console.warn('Awards table error - using empty data:', err)
+        console.error('Awards query exception:', err)
         awards = []
       }
       
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('abbr, name, owner_id')
-        .eq('active', true)
-
-      const { data: owners } = await supabase
-        .from('owners')
-        .select('id, name')
-
-      const teamLookup = {}
-      const ownerLookup = {}
-      
-      teams?.forEach(team => {
-        teamLookup[team.abbr] = team
-      })
-      
-      owners?.forEach(owner => {
-        ownerLookup[owner.id] = owner
-      })
-
-      // Load games first and get the gameState directly
-      console.log('Loading games...')
-      const currentGameState = await loadGames()
-      console.log('Games loaded, gameState keys:', Object.keys(currentGameState))
-      
-      // Then load probabilities and get them directly
-      console.log('Loading probabilities...')
-      const currentProbabilities = await loadProbabilities(teams, currentGameState)
-      console.log('Probabilities loaded:', currentProbabilities)
-      console.log('About to build processed games with probabilities:', Object.keys(currentProbabilities || {}))
-
-      // Process team stats for this week
+      // 5. Initialize team stats
+      console.log('=== PROCESSING TEAM STATS ===')
       const teamStats = {}
-      teams?.forEach(team => {
+      
+      teams.forEach(team => {
         const owner = ownerLookup[team.owner_id]
-        if (!owner) return
+        if (!owner) {
+          console.warn(`No owner found for team ${team.abbr}`)
+          return
+        }
 
         teamStats[team.abbr] = {
           abbr: team.abbr,
@@ -235,19 +231,26 @@ export default function Scoreboard() {
           ownerName: owner.name,
           earnings: 0,
           hasWin: false,
-          hasOBO: false,
-          hasDBO: false
+          oboCount: 0,
+          dboCount: 0
         }
       })
-
-      // Process awards for this week
-      awards?.forEach(award => {
+      
+      console.log('Initialized stats for', Object.keys(teamStats).length, 'teams')
+      
+      // 6. Process awards
+      console.log('=== PROCESSING AWARDS ===')
+      awards.forEach(award => {
         const team = teamStats[award.team_abbr]
-        if (!team) return
+        if (!team) {
+          console.warn(`Award for unknown team: ${award.team_abbr}`)
+          return
+        }
 
-        const ownerId = award.owner_id || team.ownerId
         const points = award.points || 1
         const earnings = points * 5
+        
+        console.log(`Processing award: ${award.type} for ${award.team_abbr} = ${earnings} earnings`)
         
         team.earnings += earnings
 
@@ -255,17 +258,23 @@ export default function Scoreboard() {
           case 'WIN':
           case 'TIE_AWAY':
             team.hasWin = true
+            console.log(`  ${award.team_abbr} marked as having win`)
             break
           case 'OBO':
-            team.hasOBO = true
+            team.oboCount += 1
+            console.log(`  ${award.team_abbr} OBO count: ${team.oboCount}`)
             break
           case 'DBO':
-            team.hasDBO = true
+            team.dboCount += 1
+            console.log(`  ${award.team_abbr} DBO count: ${team.dboCount}`)
             break
+          default:
+            console.log(`  Unknown award type: ${award.type}`)
         }
       })
-
-      // Add wins from completed games (using currentGameState)
+      
+      // 7. Add wins from completed games
+      console.log('=== ADDING GAME WINS ===')
       Object.entries(currentGameState).forEach(([teamAbbr, game]) => {
         if (game.status === 'STATUS_FINAL') {
           const team = teamStats[teamAbbr]
@@ -276,39 +285,29 @@ export default function Scoreboard() {
           if (isWin && !team.hasWin) {
             team.earnings += 5
             team.hasWin = true
+            console.log(`Added game win for ${teamAbbr}: +$5`)
           }
         }
       })
-
-      // Build games array for display - FIXED VERSION
-      console.log('Starting to build processed games array...')
+      
+      // 8. Build games array for display
+      console.log('=== BUILDING GAMES DISPLAY ===')
       const { data: gamesData } = await supabase
         .from('games')
         .select('*')
         .eq('season', currentSeason)
         .eq('week', selectedWeek)
 
-      console.log('Retrieved games data for processing:', gamesData?.length, 'games')
       const processedGames = []
       if (gamesData) {
-        console.log('Processing games with currentGameState keys:', Object.keys(currentGameState || {}).length, 'teams')
-        console.log('Processing games with currentProbabilities keys:', Object.keys(currentProbabilities || {}).length, 'teams')
-        
         gamesData.forEach(game => {
           const homeTeam = teamStats[game.home]
           const awayTeam = teamStats[game.away]
           
-          // Get the game results from currentGameState
           const homeGameState = currentGameState[game.home]
           const awayGameState = currentGameState[game.away]
-
-          // Use the probabilities we just loaded
           const homeProb = currentProbabilities[game.home] || null
           const awayProb = currentProbabilities[game.away] || null
-          
-          console.log(`Game ${game.home} vs ${game.away}:`)
-          console.log(`  Home result: ${homeGameState?.result}, Away result: ${awayGameState?.result}`)
-          console.log(`  Home prob: ${homeProb?.winProbability}, Away prob: ${awayProb?.winProbability}`)
 
           processedGames.push({
             id: `${game.home}-${game.away}`,
@@ -326,43 +325,51 @@ export default function Scoreboard() {
             awayEarnings: awayTeam?.earnings || 0,
             homeWin: homeTeam?.hasWin || false,
             awayWin: awayTeam?.hasWin || false,
-            homeOBO: homeTeam?.oboCount > 0 || false,
-            awayOBO: awayTeam?.oboCount > 0 || false,
-            homeDBO: homeTeam?.dboCount > 0 || false,
-            awayDBO: awayTeam?.dboCount > 0 || false,
-            // Use the probabilities directly from the API call
+            homeOBO: (homeTeam?.oboCount || 0) > 0,
+            awayOBO: (awayTeam?.oboCount || 0) > 0,
+            homeDBO: (homeTeam?.dboCount || 0) > 0,
+            awayDBO: (awayTeam?.dboCount || 0) > 0,
             homeProb: homeProb,
             awayProb: awayProb
           })
         })
       }
 
-      // Sort games by kickoff time
       processedGames.sort((a, b) => {
         if (!a.kickoff && !b.kickoff) return 0
         if (!a.kickoff) return 1
         if (!b.kickoff) return -1
         return new Date(a.kickoff) - new Date(b.kickoff)
       })
-
-      // Calculate owner totals
+      
+      // 9. Calculate owner totals
+      console.log('=== CALCULATING OWNER TOTALS ===')
       const ownerTotals = {}
+      
       Object.values(teamStats).forEach(team => {
         if (!ownerTotals[team.ownerId]) {
           ownerTotals[team.ownerId] = {
             id: team.ownerId,
             name: team.ownerName,
-            total: 0
+            total: 0,
+            oboCount: 0,
+            dboCount: 0
           }
         }
         ownerTotals[team.ownerId].total += team.earnings
+        ownerTotals[team.ownerId].oboCount += team.oboCount
+        ownerTotals[team.ownerId].dboCount += team.dboCount
+      })
+      
+      // Log final owner totals
+      Object.values(ownerTotals).forEach(owner => {
+        if (owner.oboCount > 0 || owner.dboCount > 0 || owner.total > 0) {
+          console.log(`${owner.name}: $${owner.total} (OBO: ${owner.oboCount}, DBO: ${owner.dboCount})`)
+        }
       })
 
-      // Sort owners by earnings
-      const sortedOwners = Object.values(ownerTotals)
-        .sort((a, b) => b.total - a.total)
-
-      // Add ranks
+      const sortedOwners = Object.values(ownerTotals).sort((a, b) => b.total - a.total)
+      
       let currentRank = 1
       sortedOwners.forEach((owner, index) => {
         if (index > 0 && owner.total < sortedOwners[index - 1].total) {
@@ -374,9 +381,12 @@ export default function Scoreboard() {
       setOwnerRankings(sortedOwners)
       setGames(processedGames)
       setLoading(false)
-      console.log('=== LOADDATA COMPLETE ===')
+      
+      console.log('=== SCOREBOARD DATA LOAD COMPLETE ===')
+      console.log('Final results:', sortedOwners.length, 'owners,', processedGames.length, 'games')
+      
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error in loadData:', error)
       setLoading(false)
     }
   }
@@ -398,14 +408,11 @@ export default function Scoreboard() {
     }
   }
 
-  // FIXED getGameStatusDisplay function
   const getGameStatusDisplay = (game, isHome) => {
     const result = isHome ? game.homeResult : game.awayResult
     const prob = isHome ? game.homeProb : game.awayProb
 
-    // Final games - show check or X emoji
     if (game.status === 'STATUS_FINAL') {
-      // For final games, check if this team won or if it's an away tie
       if (result === 'win' || (result === 'tie' && !isHome)) {
         return <span className="text-green-600">✅</span>
       } else {
@@ -413,7 +420,6 @@ export default function Scoreboard() {
       }
     }
 
-    // For in-progress or scheduled games, show probability if available
     if (prob && prob.winProbability !== undefined) {
       const winProb = prob.winProbability
       const percentage = (winProb * 100).toFixed(0)
@@ -447,7 +453,6 @@ export default function Scoreboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white shadow border-b">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center">
@@ -487,7 +492,6 @@ export default function Scoreboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Owner Rankings */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Rankings</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -521,7 +525,6 @@ export default function Scoreboard() {
           </div>
         </div>
 
-        {/* Games */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Games</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
@@ -540,7 +543,6 @@ export default function Scoreboard() {
                 </div>
 
                 <div className="space-y-2">
-                  {/* Away Team */}
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
@@ -573,7 +575,6 @@ export default function Scoreboard() {
                     </div>
                   </div>
 
-                  {/* Home Team */}
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
