@@ -256,7 +256,7 @@ export default function Scoreboard() {
     const result = isHome ? game.homeResult : game.awayResult
     const prob = isHome ? game.homeProb : game.awayProb
 
-    // Final games - show check or X emoji
+    // Final games - show check or X emoji based on game result
     if (game.status === 'STATUS_FINAL') {
       if (result === 'win' || (result === 'tie' && !isHome)) {
         return <span className="text-green-600">✅</span>
@@ -265,34 +265,29 @@ export default function Scoreboard() {
       }
     }
 
-    // In progress games - show probability with gradient like index.js
-    if (game.status === 'STATUS_IN_PROGRESS' && prob) {
+    // Live probability display for ongoing and scheduled games (like index.js)
+    if (prob && prob.confidence !== 'final') {
       const winProb = prob.winProbability
       const percentage = (winProb * 100).toFixed(0)
       
-      return (
-        <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-          winProb > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-          winProb > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
-          'bg-gradient-to-r from-red-500 to-red-600 text-white'
-        }`}>
-          {percentage}%
-        </span>
-      )
+      // Use same logic as your index.js showLiveProbability
+      const showLiveProbability = prob.confidence !== 'final' && game.status !== 'STATUS_FINAL'
+      
+      if (showLiveProbability) {
+        return (
+          <div className={`text-xs px-2 py-1 rounded-full font-bold shadow ${
+            winProb > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
+            winProb > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
+            'bg-gradient-to-r from-red-500 to-red-600 text-white'
+          }`}>
+            {percentage}%
+          </div>
+        )
+      }
     }
 
-    // Scheduled games - show probability without background
-    if (prob) {
-      const winProb = prob.winProbability
-      const percentage = (winProb * 100).toFixed(0)
-      return (
-        <span className={winProb > 0.5 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-          {percentage}%
-        </span>
-      )
-    }
-
-    return <span className="text-gray-400">—</span>
+    // Fallback for games without probability data
+    return <span className="text-gray-400 text-xs">—</span>
   }
 
   const weekOptions = Array.from({ length: 18 }, (_, i) => i + 1)
@@ -383,15 +378,15 @@ export default function Scoreboard() {
         {/* Games */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Games</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {games.map((game) => (
-              <div key={game.id} className="bg-white rounded-lg border shadow p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold text-gray-700">
+              <div key={game.id} className="bg-white rounded-lg border shadow p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-gray-700">
                     {formatGameTime(game.kickoff)}
                   </div>
                   {game.status === 'STATUS_IN_PROGRESS' && (
-                    <div className="text-sm font-bold text-blue-600">
+                    <div className="text-xs font-bold text-blue-600">
                       {game.awayScore} - {game.homeScore}
                     </div>
                   )}
@@ -399,32 +394,32 @@ export default function Scoreboard() {
 
                 <div className="space-y-2">
                   {/* Away Team */}
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
                         src={`https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/${game.awayTeam.toLowerCase()}.png`}
                         alt={`${game.awayTeam} logo`}
-                        className="w-6 h-6 object-contain"
+                        className="w-5 h-5 object-contain flex-shrink-0"
                         onError={(e) => {
                           e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                         }}
                       />
-                      <div>
-                        <div className="font-bold text-sm text-gray-900">@ {game.awayTeam}</div>
-                        <div className="text-xs text-gray-600">{game.awayOwner}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-xs text-gray-900 truncate">@ {game.awayTeam}</div>
+                        <div className="text-xs text-gray-600 truncate">{game.awayOwner}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-sm">${game.awayEarnings}</div>
-                        <div className="flex items-center space-x-1 text-xs">
+                        <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>
+                        <div className="flex items-center justify-end space-x-1 text-xs">
                           {getGameStatusDisplay(game, false)}
                           {game.awayOBO && <span>🔥</span>}
                           {game.awayDBO && <span>🛡️</span>}
                         </div>
                       </div>
                       {game.status === 'STATUS_FINAL' && (
-                        <div className="text-lg font-bold text-gray-900 w-6 text-center">
+                        <div className="text-sm font-bold text-gray-900 w-5 text-center">
                           {game.awayScore}
                         </div>
                       )}
@@ -432,32 +427,32 @@ export default function Scoreboard() {
                   </div>
 
                   {/* Home Team */}
-                  <div className="flex items-center justify-between py-2">
-                    <div className="flex items-center space-x-3">
+                  <div className="flex items-center justify-between py-1">
+                    <div className="flex items-center space-x-2 flex-1 min-w-0">
                       <img 
                         src={`https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/${game.homeTeam.toLowerCase()}.png`}
                         alt={`${game.homeTeam} logo`}
-                        className="w-6 h-6 object-contain"
+                        className="w-5 h-5 object-contain flex-shrink-0"
                         onError={(e) => {
                           e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                         }}
                       />
-                      <div>
-                        <div className="font-bold text-sm text-gray-900">{game.homeTeam}</div>
-                        <div className="text-xs text-gray-600">{game.homeOwner}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-xs text-gray-900 truncate">{game.homeTeam}</div>
+                        <div className="text-xs text-gray-600 truncate">{game.homeOwner}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-sm">${game.homeEarnings}</div>
-                        <div className="flex items-center space-x-1 text-xs">
+                        <div className="font-bold text-green-600 text-xs">${game.homeEarnings}</div>
+                        <div className="flex items-center justify-end space-x-1 text-xs">
                           {getGameStatusDisplay(game, true)}
                           {game.homeOBO && <span>🔥</span>}
                           {game.homeDBO && <span>🛡️</span>}
                         </div>
                       </div>
                       {game.status === 'STATUS_FINAL' && (
-                        <div className="text-lg font-bold text-gray-900 w-6 text-center">
+                        <div className="text-sm font-bold text-gray-900 w-5 text-center">
                           {game.homeScore}
                         </div>
                       )}
