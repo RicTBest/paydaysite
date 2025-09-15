@@ -10,6 +10,7 @@ export default function Scoreboard() {
   const [selectedWeek, setSelectedWeek] = useState(2)
   const [probabilities, setProbabilities] = useState({})
   const [gameState, setGameState] = useState({})
+  const [weekFinished, setWeekFinished] = useState(false)
 
   useEffect(() => {
     loadCurrentWeek()
@@ -139,6 +140,36 @@ export default function Scoreboard() {
     }
   }
 
+  function checkWeekFinished(gamesData, awards) {
+    console.log('=== CHECKING IF WEEK IS FINISHED ===')
+    
+    if (!gamesData || gamesData.length === 0) {
+      console.log('No games found, week not finished')
+      return false
+    }
+
+    // Check if all games are final
+    const allGamesFinal = gamesData.every(game => game.status === 'STATUS_FINAL')
+    console.log('All games final:', allGamesFinal)
+
+    if (!allGamesFinal) {
+      console.log('Not all games are final, week not finished')
+      return false
+    }
+
+    // Check if there's at least one OBO and one DBO award
+    const hasOBO = awards.some(award => award.type === 'OBO')
+    const hasDBO = awards.some(award => award.type === 'DBO')
+    
+    console.log('Has OBO award:', hasOBO)
+    console.log('Has DBO award:', hasDBO)
+
+    const weekFinished = allGamesFinal && hasOBO && hasDBO
+    console.log('Week finished:', weekFinished)
+    
+    return weekFinished
+  }
+
   async function loadData() {
     console.log('=== STARTING SCOREBOARD DATA LOAD ===')
     console.log('Season:', currentSeason, 'Selected Week:', selectedWeek)
@@ -212,8 +243,19 @@ export default function Scoreboard() {
         console.error('Awards query exception:', err)
         awards = []
       }
+
+      // 5. Get games data again for week finished check
+      const { data: gamesData } = await supabase
+        .from('games')
+        .select('*')
+        .eq('season', currentSeason)
+        .eq('week', selectedWeek)
+
+      // 6. Check if week is finished
+      const isWeekFinished = checkWeekFinished(gamesData, awards)
+      setWeekFinished(isWeekFinished)
       
-      // 5. Initialize team stats
+      // 7. Initialize team stats
       console.log('=== PROCESSING TEAM STATS ===')
       const teamStats = {}
       
@@ -238,7 +280,7 @@ export default function Scoreboard() {
       
       console.log('Initialized stats for', Object.keys(teamStats).length, 'teams')
       
-      // 6. Process awards
+      // 8. Process awards
       console.log('=== PROCESSING AWARDS ===')
       awards.forEach(award => {
         const team = teamStats[award.team_abbr]
@@ -273,7 +315,7 @@ export default function Scoreboard() {
         }
       })
       
-      // 7. Add wins from completed games
+      // 9. Add wins from completed games
       console.log('=== ADDING GAME WINS ===')
       Object.entries(currentGameState).forEach(([teamAbbr, game]) => {
         if (game.status === 'STATUS_FINAL') {
@@ -290,14 +332,8 @@ export default function Scoreboard() {
         }
       })
       
-      // 8. Build games array for display
+      // 10. Build games array for display
       console.log('=== BUILDING GAMES DISPLAY ===')
-      const { data: gamesData } = await supabase
-        .from('games')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
-
       const processedGames = []
       if (gamesData) {
         gamesData.forEach(game => {
@@ -342,7 +378,7 @@ export default function Scoreboard() {
         return new Date(a.kickoff) - new Date(b.kickoff)
       })
       
-      // 9. Calculate owner totals
+      // 11. Calculate owner totals
       console.log('=== CALCULATING OWNER TOTALS ===')
       const ownerTotals = {}
       
@@ -514,7 +550,8 @@ export default function Scoreboard() {
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-bold text-green-600">
-                      {owner.total === 0 && <span>🥚</span>}
+                      {/* Only show goose egg if week is finished and owner scored zero */}
+                      {weekFinished && owner.total === 0 && <span>🥚</span>}
                       {(owner.oboCount || 0) > 0 && <span>🔥</span>}
                       {(owner.dboCount || 0) > 0 && <span>🛡️</span>}
                       ${owner.total}
