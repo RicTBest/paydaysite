@@ -632,9 +632,9 @@ export default function Scoreboard() {
                       <div className="text-right">
                         <div className="font-bold text-green-600 text-xs">${game.homeEarnings}</div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
-                          {getGameStatusDisplay(game, true)}
                           {game.homeOBO && <span>🔥</span>}
                           {game.homeDBO && <span>🛡️</span>}
+                          {getGameStatusDisplay(game, true)}
                         </div>
                       </div>
                       <div className="text-sm font-bold text-gray-900 w-5 text-center">
