@@ -254,7 +254,6 @@ export default function Scoreboard() {
 
   const getGameStatusDisplay = (game, isHome) => {
     const result = isHome ? game.homeResult : game.awayResult
-    const hasWin = isHome ? game.homeWin : game.awayWin
     const prob = isHome ? game.homeProb : game.awayProb
 
     // Final games - show check or X emoji
@@ -384,45 +383,48 @@ export default function Scoreboard() {
         {/* Games */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Games</h2>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {games.map((game) => (
-              <div key={game.id} className="bg-white rounded-lg border shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-lg font-semibold text-gray-700">
+              <div key={game.id} className="bg-white rounded-lg border shadow p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-sm font-semibold text-gray-700">
                     {formatGameTime(game.kickoff)}
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {game.status === 'STATUS_FINAL' ? 'Final' : 
-                     game.status === 'STATUS_IN_PROGRESS' ? 'In Progress' : 'Scheduled'}
-                  </div>
+                  {game.status === 'STATUS_IN_PROGRESS' && (
+                    <div className="text-sm font-bold text-blue-600">
+                      {game.awayScore} - {game.homeScore}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* Away Team */}
                   <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                       <img 
                         src={`https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/${game.awayTeam.toLowerCase()}.png`}
                         alt={`${game.awayTeam} logo`}
-                        className="w-8 h-8 object-contain"
+                        className="w-6 h-6 object-contain"
                         onError={(e) => {
                           e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                         }}
                       />
                       <div>
-                        <div className="font-bold text-gray-900">@ {game.awayTeam}</div>
-                        <div className="text-sm text-gray-600">{game.awayOwner}</div>
+                        <div className="font-bold text-sm text-gray-900">@ {game.awayTeam}</div>
+                        <div className="text-xs text-gray-600">{game.awayOwner}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <div className="font-bold text-green-600">${game.awayEarnings}</div>
-                        <div className="text-sm text-gray-600">
-                          {getTeamStatus(game.awayTeam, false, game)}
+                        <div className="font-bold text-green-600 text-sm">${game.awayEarnings}</div>
+                        <div className="flex items-center space-x-1 text-xs">
+                          {getGameStatusDisplay(game, false)}
+                          {game.awayOBO && <span>🔥</span>}
+                          {game.awayDBO && <span>🛡️</span>}
                         </div>
                       </div>
                       {game.status === 'STATUS_FINAL' && (
-                        <div className="text-xl font-bold text-gray-900 w-8 text-center">
+                        <div className="text-lg font-bold text-gray-900 w-6 text-center">
                           {game.awayScore}
                         </div>
                       )}
@@ -431,29 +433,31 @@ export default function Scoreboard() {
 
                   {/* Home Team */}
                   <div className="flex items-center justify-between py-2">
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                       <img 
                         src={`https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/${game.homeTeam.toLowerCase()}.png`}
                         alt={`${game.homeTeam} logo`}
-                        className="w-8 h-8 object-contain"
+                        className="w-6 h-6 object-contain"
                         onError={(e) => {
                           e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                         }}
                       />
                       <div>
-                        <div className="font-bold text-gray-900">{game.homeTeam}</div>
-                        <div className="text-sm text-gray-600">{game.homeOwner}</div>
+                        <div className="font-bold text-sm text-gray-900">{game.homeTeam}</div>
+                        <div className="text-xs text-gray-600">{game.homeOwner}</div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-3">
                       <div className="text-right">
-                        <div className="font-bold text-green-600">${game.homeEarnings}</div>
-                        <div className="text-sm text-gray-600">
-                          {getTeamStatus(game.homeTeam, true, game)}
+                        <div className="font-bold text-green-600 text-sm">${game.homeEarnings}</div>
+                        <div className="flex items-center space-x-1 text-xs">
+                          {getGameStatusDisplay(game, true)}
+                          {game.homeOBO && <span>🔥</span>}
+                          {game.homeDBO && <span>🛡️</span>}
                         </div>
                       </div>
                       {game.status === 'STATUS_FINAL' && (
-                        <div className="text-xl font-bold text-gray-900 w-8 text-center">
+                        <div className="text-lg font-bold text-gray-900 w-6 text-center">
                           {game.homeScore}
                         </div>
                       )}
