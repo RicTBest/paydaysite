@@ -59,7 +59,6 @@ export default function Scoreboard() {
   }
 
   async function loadWeeklyData() {
-    console.log('NEW CODE IS RUNNING')
     setLoading(true)
     try {
       console.log('Loading data for season:', currentSeason, 'week:', selectedWeek)
