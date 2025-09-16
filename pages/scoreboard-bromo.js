@@ -17,7 +17,8 @@ export default function BromoScoreboard() {
     
     const interval = setInterval(() => {
       console.log('Auto-refreshing bromo scoreboard data...')
-      if (currentSeason && selectedWeek) {
+      // Only auto-refresh if we're viewing the current week
+      if (currentSeason && selectedWeek && selectedWeek === currentWeek) {
         loadData()
       }
     }, 60 * 1000)
@@ -25,7 +26,7 @@ export default function BromoScoreboard() {
     return () => {
       clearInterval(interval)
     }
-  }, [])
+  }, [currentWeek, selectedWeek])
 
   useEffect(() => {
     if (currentSeason && selectedWeek) {
@@ -43,8 +44,8 @@ export default function BromoScoreboard() {
         setCurrentSeason(data.season)
         setCurrentWeek(data.week)
         
-        // Only set selectedWeek if it's still the default (not manually changed)
-        if (selectedWeek === currentWeek || selectedWeek === 2) {
+        // Only set selectedWeek if it hasn't been manually changed by the user
+        if (selectedWeek === 2) { // Only on initial load (default value)
           setSelectedWeek(data.week)
         }
         
@@ -517,7 +518,7 @@ export default function BromoScoreboard() {
           <div className="text-center">
             <div className="flex justify-between items-center mb-4">
               <a
-                href="/bromo"
+                href="/bromos"
                 className="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center space-x-1"
               >
                 <span>←</span>
@@ -631,9 +632,9 @@ export default function BromoScoreboard() {
                           {game.awayOwner !== 'Non-Bromo' ? `$${game.awayEarnings}` : '—'}
                         </div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
-                          {getGameStatusDisplay(game, false)}
                           {game.awayOBO && <span>🔥</span>}
                           {game.awayDBO && <span>🛡️</span>}
+                          {getGameStatusDisplay(game, false)}
                         </div>
                       </div>
                       <div className="text-sm font-bold text-gray-900 w-5 text-center">
