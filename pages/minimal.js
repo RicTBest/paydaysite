@@ -7,15 +7,15 @@ export default function MinimalistScoreboard() {
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
   const [currentWeek, setCurrentWeek] = useState(2)
-  const [selectedWeek, setSelectedWeek] = useState(2)
+  const [selectedWeek, setSelectedWeek] = useState('overall')
 
   useEffect(() => {
     loadCurrentWeek()
     
     const interval = setInterval(() => {
       console.log('Auto-refreshing minimalist scoreboard...')
-      // Only auto-refresh if we're viewing the current week
-      if (currentSeason && selectedWeek && selectedWeek === currentWeek) {
+      // Only auto-refresh if we're viewing the current week or overall
+      if (currentSeason && (selectedWeek === 'overall' || (selectedWeek === currentWeek))) {
         loadData()
       }
     }, 60 * 1000)
@@ -42,8 +42,8 @@ export default function MinimalistScoreboard() {
         setCurrentWeek(data.week)
         
         // Only set selectedWeek if it hasn't been manually changed by the user
-        if (selectedWeek === 2) { // Only on initial load (default value)
-          setSelectedWeek(data.week)
+        if (selectedWeek === 'overall') { // Keep default as overall
+          // Don't auto-change from overall to current week
         }
         
         setTimeout(() => {
@@ -85,135 +85,14 @@ export default function MinimalistScoreboard() {
       owners.forEach(owner => {
         ownerLookup[owner.id] = owner
       })
-      
-      // 3. Load games for game state
-      const { data: gamesData } = await supabase
-        .from('games')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
 
-      const gameState = {}
-      if (gamesData) {
-        gamesData.forEach(game => {
-          const getResult = (isHome, status, homeScore, awayScore) => {
-            if (status !== 'STATUS_FINAL') return null
-            const myScore = isHome ? homeScore : awayScore
-            const theirScore = isHome ? awayScore : homeScore
-            return myScore > theirScore ? 'win' : myScore < theirScore ? 'loss' : 'tie'
-          }
-          
-          const homeResult = getResult(true, game.status, game.home_pts, game.away_pts)
-          const awayResult = getResult(false, game.status, game.home_pts, game.away_pts)
-          
-          gameState[game.home] = {
-            status: game.status,
-            result: homeResult
-          }
-          
-          gameState[game.away] = {
-            status: game.status,
-            result: awayResult
-          }
-        })
+      if (selectedWeek === 'overall') {
+        // Load overall totals across all weeks
+        await loadOverallData(teams, owners, teamLookup, ownerLookup)
+      } else {
+        // Load specific week data
+        await loadWeekData(teams, owners, teamLookup, ownerLookup, selectedWeek)
       }
-      
-      // 4. Load awards
-      const { data: awardsData } = await supabase
-        .from('awards')
-        .select('*')
-        .eq('season', currentSeason)
-        .eq('week', selectedWeek)
-
-      const awards = awardsData || []
-      
-      // 5. Initialize team stats
-      const teamStats = {}
-      
-      teams.forEach(team => {
-        const owner = ownerLookup[team.owner_id]
-        if (!owner) return
-
-        teamStats[team.abbr] = {
-          abbr: team.abbr,
-          name: team.name,
-          ownerId: team.owner_id,
-          ownerName: owner.name,
-          earnings: 0,
-          hasWin: false
-        }
-      })
-      
-      // 6. Process awards
-      awards.forEach(award => {
-        const team = teamStats[award.team_abbr]
-        if (!team) return
-
-        const points = award.points || 1
-        const earnings = points * 5
-        
-        team.earnings += earnings
-
-        if (award.type === 'WIN' || award.type === 'TIE_AWAY') {
-          team.hasWin = true
-        }
-      })
-      
-      // 7. Add wins from completed games
-      Object.entries(gameState).forEach(([teamAbbr, game]) => {
-        if (game.status === 'STATUS_FINAL') {
-          const team = teamStats[teamAbbr]
-          if (!team) return
-
-          const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
-          
-          if (isWin && !team.hasWin) {
-            team.earnings += 5
-            team.hasWin = true
-          }
-        }
-      })
-      
-      // 8. Calculate owner totals and team earnings
-      const ownerTotals = {}
-      const teamEarningsMap = {}
-      
-      Object.values(teamStats).forEach(team => {
-        if (!ownerTotals[team.ownerId]) {
-          ownerTotals[team.ownerId] = {
-            id: team.ownerId,
-            name: team.ownerName,
-            total: 0,
-            teams: []
-          }
-        }
-        ownerTotals[team.ownerId].total += team.earnings
-        ownerTotals[team.ownerId].teams.push({
-          abbr: team.abbr,
-          earnings: team.earnings
-        })
-        
-        teamEarningsMap[team.abbr] = team.earnings
-      })
-
-      const sortedOwners = Object.values(ownerTotals).sort((a, b) => b.total - a.total)
-      
-      let currentRank = 1
-      sortedOwners.forEach((owner, index) => {
-        if (index > 0 && owner.total < sortedOwners[index - 1].total) {
-          currentRank = index + 1
-        }
-        owner.rank = currentRank
-        
-        // Sort teams by earnings within each owner
-        owner.teams.sort((a, b) => b.earnings - a.earnings)
-      })
-
-      setOwnerRankings(sortedOwners)
-      setTeamEarnings(teamEarningsMap)
-      setLoading(false)
-      
-      console.log('=== MINIMALIST SCOREBOARD LOAD COMPLETE ===')
       
     } catch (error) {
       console.error('Error in minimalist loadData:', error)
@@ -221,7 +100,243 @@ export default function MinimalistScoreboard() {
     }
   }
 
-  const weekOptions = Array.from({ length: 18 }, (_, i) => i + 1)
+  async function loadOverallData(teams, owners, teamLookup, ownerLookup) {
+    console.log('Loading overall data across all weeks...')
+    
+    // Load all awards across all weeks for current season
+    const { data: allAwardsData } = await supabase
+      .from('awards')
+      .select('*')
+      .eq('season', currentSeason)
+
+    const allAwards = allAwardsData || []
+    
+    // Load all games across all weeks for current season to get wins
+    const { data: allGamesData } = await supabase
+      .from('games')
+      .select('*')
+      .eq('season', currentSeason)
+      .eq('status', 'STATUS_FINAL')
+
+    // Initialize team stats
+    const teamStats = {}
+    
+    teams.forEach(team => {
+      const owner = ownerLookup[team.owner_id]
+      if (!owner) return
+
+      teamStats[team.abbr] = {
+        abbr: team.abbr,
+        name: team.name,
+        ownerId: team.owner_id,
+        ownerName: owner.name,
+        earnings: 0,
+        wins: 0
+      }
+    })
+    
+    // Process all awards
+    allAwards.forEach(award => {
+      const team = teamStats[award.team_abbr]
+      if (!team) return
+
+      const points = award.points || 1
+      const earnings = points * 5
+      
+      team.earnings += earnings
+
+      if (award.type === 'WIN' || award.type === 'TIE_AWAY') {
+        team.wins += 1
+      }
+    })
+    
+    // Process game wins (only count wins not already counted by awards)
+    const winsByWeek = {}
+    allAwards.forEach(award => {
+      if (award.type === 'WIN' || award.type === 'TIE_AWAY') {
+        if (!winsByWeek[award.week]) winsByWeek[award.week] = new Set()
+        winsByWeek[award.week].add(award.team_abbr)
+      }
+    })
+
+    if (allGamesData) {
+      allGamesData.forEach(game => {
+        const getWinner = (game) => {
+          if (game.home_pts > game.away_pts) return game.home
+          if (game.away_pts > game.home_pts) return game.away
+          return game.away // Tie goes to away team
+        }
+        
+        const winner = getWinner(game)
+        const team = teamStats[winner]
+        if (!team) return
+        
+        // Only add win earnings if this win wasn't already counted by awards
+        const weekWinners = winsByWeek[game.week] || new Set()
+        if (!weekWinners.has(winner)) {
+          team.earnings += 5
+          team.wins += 1
+        }
+      })
+    }
+
+    buildOwnerRankings(teamStats)
+  }
+
+  async function loadWeekData(teams, owners, teamLookup, ownerLookup, week) {
+    console.log('Loading week data for week:', week)
+    
+    // 3. Load games for game state
+    const { data: gamesData } = await supabase
+      .from('games')
+      .select('*')
+      .eq('season', currentSeason)
+      .eq('week', week)
+
+    const gameState = {}
+    if (gamesData) {
+      gamesData.forEach(game => {
+        const getResult = (isHome, status, homeScore, awayScore) => {
+          if (status !== 'STATUS_FINAL') return null
+          const myScore = isHome ? homeScore : awayScore
+          const theirScore = isHome ? awayScore : homeScore
+          return myScore > theirScore ? 'win' : myScore < theirScore ? 'loss' : 'tie'
+        }
+        
+        const homeResult = getResult(true, game.status, game.home_pts, game.away_pts)
+        const awayResult = getResult(false, game.status, game.home_pts, game.away_pts)
+        
+        gameState[game.home] = {
+          status: game.status,
+          result: homeResult,
+          isHome: true
+        }
+        
+        gameState[game.away] = {
+          status: game.status,
+          result: awayResult,
+          isHome: false
+        }
+      })
+    }
+    
+    // 4. Load awards for the specific week
+    const { data: awardsData } = await supabase
+      .from('awards')
+      .select('*')
+      .eq('season', currentSeason)
+      .eq('week', week)
+
+    const awards = awardsData || []
+    
+    // 5. Initialize team stats
+    const teamStats = {}
+    
+    teams.forEach(team => {
+      const owner = ownerLookup[team.owner_id]
+      if (!owner) return
+
+      teamStats[team.abbr] = {
+        abbr: team.abbr,
+        name: team.name,
+        ownerId: team.owner_id,
+        ownerName: owner.name,
+        earnings: 0,
+        hasWin: false,
+        oboCount: 0,
+        dboCount: 0
+      }
+    })
+    
+    // 6. Process awards
+    awards.forEach(award => {
+      const team = teamStats[award.team_abbr]
+      if (!team) return
+
+      const points = award.points || 1
+      const earnings = points * 5
+      
+      team.earnings += earnings
+
+      switch (award.type) {
+        case 'WIN':
+        case 'TIE_AWAY':
+          team.hasWin = true
+          break
+        case 'OBO':
+          team.oboCount += 1
+          break
+        case 'DBO':
+          team.dboCount += 1
+          break
+      }
+    })
+    
+    // 7. Add wins from completed games
+    Object.entries(gameState).forEach(([teamAbbr, game]) => {
+      if (game.status === 'STATUS_FINAL') {
+        const team = teamStats[teamAbbr]
+        if (!team) return
+
+        const isWin = game.result === 'win' || (game.result === 'tie' && !game.isHome)
+        
+        if (isWin && !team.hasWin) {
+          team.earnings += 5
+          team.hasWin = true
+        }
+      }
+    })
+
+    buildOwnerRankings(teamStats)
+  }
+
+  function buildOwnerRankings(teamStats) {
+    // 8. Calculate owner totals and team earnings
+    const ownerTotals = {}
+    const teamEarningsMap = {}
+    
+    Object.values(teamStats).forEach(team => {
+      if (!ownerTotals[team.ownerId]) {
+        ownerTotals[team.ownerId] = {
+          id: team.ownerId,
+          name: team.ownerName,
+          total: 0,
+          teams: []
+        }
+      }
+      ownerTotals[team.ownerId].total += team.earnings
+      ownerTotals[team.ownerId].teams.push({
+        abbr: team.abbr,
+        earnings: team.earnings,
+        oboCount: team.oboCount || 0,
+        dboCount: team.dboCount || 0,
+        wins: team.wins || 0
+      })
+      
+      teamEarningsMap[team.abbr] = team.earnings
+    })
+
+    const sortedOwners = Object.values(ownerTotals).sort((a, b) => b.total - a.total)
+    
+    let currentRank = 1
+    sortedOwners.forEach((owner, index) => {
+      if (index > 0 && owner.total < sortedOwners[index - 1].total) {
+        currentRank = index + 1
+      }
+      owner.rank = currentRank
+      
+      // Sort teams by earnings within each owner
+      owner.teams.sort((a, b) => b.earnings - a.earnings)
+    })
+
+    setOwnerRankings(sortedOwners)
+    setTeamEarnings(teamEarningsMap)
+    setLoading(false)
+    
+    console.log('=== MINIMALIST SCOREBOARD LOAD COMPLETE ===')
+  }
+
+  const weekOptions = ['overall', ...Array.from({ length: 18 }, (_, i) => i + 1)]
 
   if (loading) {
     return (
@@ -246,16 +361,16 @@ export default function MinimalistScoreboard() {
             ← Back to League
           </a>
           <h1 className="text-xl font-bold text-gray-900">
-            Week {selectedWeek}
+            {selectedWeek === 'overall' ? 'Overall Standings' : `Week ${selectedWeek}`}
           </h1>
           <select
             value={selectedWeek}
-            onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+            onChange={(e) => setSelectedWeek(e.target.value === 'overall' ? 'overall' : parseInt(e.target.value))}
             className="bg-white border border-gray-300 rounded px-2 py-1 text-sm font-semibold text-gray-900"
           >
             {weekOptions.map(week => (
               <option key={week} value={week}>
-                Week {week}
+                {week === 'overall' ? 'Overall' : `Week ${week}`}
               </option>
             ))}
           </select>
@@ -310,6 +425,8 @@ export default function MinimalistScoreboard() {
                       }}
                     />
                     <span className="text-xs font-semibold text-gray-700">{team.abbr}</span>
+                    {selectedWeek !== 'overall' && (team.oboCount > 0) && <span className="text-xs">🔥</span>}
+                    {selectedWeek !== 'overall' && (team.dboCount > 0) && <span className="text-xs">🛡️</span>}
                     <span className="text-xs font-bold text-green-600">${team.earnings}</span>
                   </div>
                 ))}
@@ -322,7 +439,7 @@ export default function MinimalistScoreboard() {
       {ownerRankings.length === 0 && (
         <div className="text-center py-12">
           <div className="text-lg font-bold text-gray-700 mb-2">No Data</div>
-          <p className="text-gray-600">No data available for Week {selectedWeek}</p>
+          <p className="text-gray-600">No data available for {selectedWeek === 'overall' ? 'overall standings' : `Week ${selectedWeek}`}</p>
         </div>
       )}
     </div>
