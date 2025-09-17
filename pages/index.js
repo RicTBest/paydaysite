@@ -8,7 +8,7 @@ export default function Home() {
   const [games, setGames] = useState({})
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
-  const [currentWeek, setCurrentWeek] = useState(2)
+  const [currentWeek, setCurrentWeek] = useState(3)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
 
