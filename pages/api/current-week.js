@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       error: error.message,
       // Fallback to manual calculation
       season: 2025,
-      week: 2,
+      week: 3,
       seasonType: 2
     })
   }
