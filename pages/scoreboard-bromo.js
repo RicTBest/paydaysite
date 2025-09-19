@@ -7,7 +7,7 @@ export default function BromoScoreboard() {
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
   const [currentWeek, setCurrentWeek] = useState(null)
-  const [selectedWeek, setSelectedWeek] = useState(null)
+  const [selectedWeek, setSelectedWeek] = useState(null) // Set a default value
   const [probabilities, setProbabilities] = useState({})
   const [gameState, setGameState] = useState({})
   const [weekFinished, setWeekFinished] = useState(false)
@@ -26,7 +26,7 @@ export default function BromoScoreboard() {
     return () => {
       clearInterval(interval)
     }
-  }, [currentWeek, selectedWeek])
+  }, [currentWeek, selectedWeek, currentSeason]) // Added dependencies
 
   useEffect(() => {
     if (currentSeason && selectedWeek) {
@@ -630,7 +630,8 @@ export default function BromoScoreboard() {
                       <div className="text-right">
                         {/* Only show earnings if game is finished */}
                         {game.status === 'STATUS_FINAL' && (
-                          <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>)}
+                          <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>
+                        )}
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {game.awayOBO && <span>🔥</span>}
                           {game.awayDBO && <span>🛡️</span>}
