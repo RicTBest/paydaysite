@@ -628,9 +628,9 @@ export default function BromoScoreboard() {
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-xs">
-                          {game.awayOwner !== 'Non-Bromo' ? `$${game.awayEarnings}` : '—'}
-                        </div>
+                        {/* Only show earnings if game is finished */}
+                        {game.status === 'STATUS_FINAL' && (
+                          <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {game.awayOBO && <span>🔥</span>}
                           {game.awayDBO && <span>🛡️</span>}
@@ -666,9 +666,10 @@ export default function BromoScoreboard() {
                     </div>
                     <div className="flex items-center space-x-2 flex-shrink-0">
                       <div className="text-right">
-                        <div className="font-bold text-green-600 text-xs">
-                          {game.homeOwner !== 'Non-Bromo' ? `$${game.homeEarnings}` : '—'}
-                        </div>
+                        {/* Only show earnings if game is finished */}
+                        {game.status === 'STATUS_FINAL' && (
+                          <div className="font-bold text-green-600 text-xs">${game.homeEarnings}</div>
+                        )}
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {game.homeOBO && <span>🔥</span>}
                           {game.homeDBO && <span>🛡️</span>}
