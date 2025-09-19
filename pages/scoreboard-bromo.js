@@ -630,7 +630,7 @@ export default function BromoScoreboard() {
                       <div className="text-right">
                         {/* Only show earnings if game is finished */}
                         {game.status === 'STATUS_FINAL' && (
-                          <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>
+                          <div className="font-bold text-green-600 text-xs">${game.awayEarnings}</div>)}
                         <div className="flex items-center justify-end space-x-1 text-xs">
                           {game.awayOBO && <span>🔥</span>}
                           {game.awayDBO && <span>🛡️</span>}
