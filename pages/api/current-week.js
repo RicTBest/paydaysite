@@ -1,6 +1,6 @@
 // Alternative approach using ESPN's calendar data
 static async getCurrentWeek() {
-  // try {
+  try {
   //   // Try the regular season scoreboard first
   //   const response = await axios.get(`${ESPN_BASE_URL}/scoreboard?seasontype=2`)
   //   const data = response.data
