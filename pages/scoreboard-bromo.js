@@ -6,8 +6,8 @@ export default function BromoScoreboard() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
-  const [currentWeek, setCurrentWeek] = useState(null)
-  const [selectedWeek, setSelectedWeek] = useState(null) // Set a default value
+  const [currentWeek, setCurrentWeek] = useState(3)
+  const [selectedWeek, setSelectedWeek] = useState(3) // Set a default value
   const [probabilities, setProbabilities] = useState({})
   const [gameState, setGameState] = useState({})
   const [weekFinished, setWeekFinished] = useState(false)
