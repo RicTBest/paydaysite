@@ -1,18 +1,18 @@
 // Alternative approach using ESPN's calendar data
 static async getCurrentWeek() {
-  try {
-    // Try the regular season scoreboard first
-    const response = await axios.get(`${ESPN_BASE_URL}/scoreboard?seasontype=2`)
-    const data = response.data
+  // try {
+  //   // Try the regular season scoreboard first
+  //   const response = await axios.get(`${ESPN_BASE_URL}/scoreboard?seasontype=2`)
+  //   const data = response.data
     
-    // If we get regular season data, use it
-    if (data.season && data.season.type === 2) {
-      return {
-        season: data.season.year,
-        week: data.week.number,
-        seasonType: 2
-      }
-    }
+  //   // If we get regular season data, use it
+  //   if (data.season && data.season.type === 2) {
+  //     return {
+  //       season: data.season.year,
+  //       week: data.week.number,
+  //       seasonType: 2
+  //     }
+  //   }
     
     // Fallback: Use date-based calculation
     const now = new Date()
