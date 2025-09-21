@@ -23,22 +23,35 @@ export default function Scoreboard() {
       const now = new Date()
       const year = now.getFullYear()
       
-      // NFL season start dates
+      // Calculate Labor Day (first Monday in September) and season start (Tuesday after)
+      const calculateSeasonStart = (year) => {
+        const laborDay = new Date(year, 8, 1) // September 1st
+        // Find first Monday in September
+        while (laborDay.getDay() !== 1) { // 1 = Monday
+          laborDay.setDate(laborDay.getDate() + 1)
+        }
+        // Season starts Tuesday after Labor Day (week runs Tuesday to Tuesday)
+        const seasonStart = new Date(laborDay)
+        seasonStart.setDate(laborDay.getDate() + 1) // +1 day = Tuesday
+        return seasonStart
+      }
+      
+      // Pre-calculated for accuracy, but fallback available
       const seasonStartDates = {
-        2025: new Date('2025-09-05'),
-        2026: new Date('2026-09-10'),
-        2024: new Date('2024-09-05')
+        2024: new Date('2024-09-03'), // Tuesday, Sept 3, 2024 (Labor Day was Sept 2)
+        2025: new Date('2025-09-02'), // Tuesday, Sept 2, 2025 (Labor Day is Sept 1)
+        2026: new Date('2026-09-08'), // Tuesday, Sept 8, 2026 (Labor Day is Sept 7)
+        2027: new Date('2027-09-07'), // Tuesday, Sept 7, 2027 (Labor Day is Sept 6)
+        2028: new Date('2028-09-05'), // Tuesday, Sept 5, 2028 (Labor Day is Sept 4)
+        2029: new Date('2029-09-04'), // Tuesday, Sept 4, 2029 (Labor Day is Sept 3)
+        2030: new Date('2030-09-03'), // Tuesday, Sept 3, 2030 (Labor Day is Sept 2)
       }
       
       let seasonStart = seasonStartDates[year]
       if (!seasonStart) {
-        // Fallback calculation
-        const laborDay = new Date(year, 8, 1)
-        while (laborDay.getDay() !== 1) {
-          laborDay.setDate(laborDay.getDate() + 1)
-        }
-        seasonStart = new Date(laborDay)
-        seasonStart.setDate(laborDay.getDate() + 3)
+        // Fallback calculation for any year not pre-defined
+        seasonStart = calculateSeasonStart(year)
+        console.warn(`Season start date not defined for year ${year}, calculated: ${seasonStart.toDateString()}`)
       }
       
       const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24))
