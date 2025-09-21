@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 export default function Scoreboard() {
@@ -6,19 +6,69 @@ export default function Scoreboard() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
-  const [currentWeek, setCurrentWeek] = useState(3)
-  const [selectedWeek, setSelectedWeek] = useState(3)
+  const [currentWeek, setCurrentWeek] = useState(null)
+  const [selectedWeek, setSelectedWeek] = useState(null)
   const [probabilities, setProbabilities] = useState({})
   const [gameState, setGameState] = useState({})
   const [weekFinished, setWeekFinished] = useState(false)
+  
+  // Track if this is the initial load to avoid overwriting user selections
+  const hasInitializedWeek = useRef(false)
+  // Track if we're currently doing a background refresh
+  const isBackgroundRefresh = useRef(false)
+
+  // Inline week calculation for speed
+  const calculateCurrentWeek = () => {
+    try {
+      const now = new Date()
+      const year = now.getFullYear()
+      
+      // NFL season start dates
+      const seasonStartDates = {
+        2025: new Date('2025-09-05'),
+        2026: new Date('2026-09-10'),
+        2024: new Date('2024-09-05')
+      }
+      
+      let seasonStart = seasonStartDates[year]
+      if (!seasonStart) {
+        // Fallback calculation
+        const laborDay = new Date(year, 8, 1)
+        while (laborDay.getDay() !== 1) {
+          laborDay.setDate(laborDay.getDate() + 1)
+        }
+        seasonStart = new Date(laborDay)
+        seasonStart.setDate(laborDay.getDate() + 3)
+      }
+      
+      const daysSinceStart = Math.floor((now - seasonStart) / (1000 * 60 * 60 * 24))
+      
+      if (daysSinceStart < 0) {
+        return { season: year, week: 1 }
+      }
+      
+      const week = Math.floor(daysSinceStart / 7) + 1
+      
+      if (week <= 18) {
+        return { season: year, week: week }
+      }
+      
+      return { season: year, week: 18 } // Cap at week 18
+    } catch (error) {
+      console.error('Error calculating current week:', error)
+      // Return null to indicate calculation failed, let the component handle gracefully
+      return { season: 2025, week: null }
+    }
+  }
 
   useEffect(() => {
     loadCurrentWeek()
     
     const interval = setInterval(() => {
-      console.log('Auto-refreshing scoreboard data...')
-      // Only auto-refresh if we're viewing the current week
-      if (currentSeason && selectedWeek && selectedWeek === currentWeek) {
+      // Only auto-refresh if we're viewing the current week and both values are set
+      if (currentSeason && selectedWeek && currentWeek && selectedWeek === currentWeek) {
+        console.log('Auto-refreshing scoreboard data (background)...')
+        isBackgroundRefresh.current = true
         loadData()
       }
     }, 60 * 1000)
@@ -29,7 +79,7 @@ export default function Scoreboard() {
   }, [currentWeek, selectedWeek])
 
   useEffect(() => {
-    if (currentSeason && selectedWeek) {
+    if (currentSeason && selectedWeek && selectedWeek !== null) {
       loadData()
     }
   }, [currentSeason, selectedWeek])
@@ -37,24 +87,45 @@ export default function Scoreboard() {
   async function loadCurrentWeek() {
     console.log('Loading current week...')
     try {
-      const response = await fetch('/api/current-week')
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Current week API response:', data)
-        setCurrentSeason(data.season)
-        setCurrentWeek(data.week)
-        
-        // Only set selectedWeek if it hasn't been manually changed by the user
-        if (selectedWeek === 2) { // Only on initial load (default value)
-          setSelectedWeek(data.week)
-        }
-        
+      // Use inline calculation instead of API call for speed
+      const currentWeekData = calculateCurrentWeek()
+      
+      console.log('Current week calculated:', currentWeekData)
+      setCurrentSeason(currentWeekData.season)
+      setCurrentWeek(currentWeekData.week)
+      
+      // Only set selectedWeek on the very first load and if we got a valid week
+      if (!hasInitializedWeek.current && currentWeekData.week !== null) {
+        setSelectedWeek(currentWeekData.week)
+        hasInitializedWeek.current = true
+      }
+      
+      // Only proceed with data loading if we have a valid week
+      if (currentWeekData.week !== null) {
         setTimeout(() => {
           loadData()
         }, 100)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
+      // If we fail to get current week, try to load data anyway with fallback
+      // This allows the component to still function even if week calculation fails
+      if (!hasInitializedWeek.current) {
+        // Set a reasonable fallback based on current date
+        const now = new Date()
+        const month = now.getMonth() + 1 // 0-indexed, so add 1
+        let fallbackWeek = 1
+        
+        if (month >= 9) { // September or later
+          fallbackWeek = Math.min(Math.floor((now.getDate() - 5) / 7) + 1, 18)
+          fallbackWeek = Math.max(fallbackWeek, 1) // Ensure at least week 1
+        }
+        
+        console.log('Using fallback week:', fallbackWeek)
+        setCurrentWeek(fallbackWeek)
+        setSelectedWeek(fallbackWeek)
+        hasInitializedWeek.current = true
+      }
       loadData()
     }
   }
@@ -174,9 +245,13 @@ export default function Scoreboard() {
   async function loadData() {
     console.log('=== STARTING SCOREBOARD DATA LOAD ===')
     console.log('Season:', currentSeason, 'Selected Week:', selectedWeek)
+    console.log('Background refresh:', isBackgroundRefresh.current)
     
     try {
-      setLoading(true)
+      // Only show loading spinner if this is not a background refresh
+      if (!isBackgroundRefresh.current) {
+        setLoading(true)
+      }
       
       // 1. Load base data
       const [teamsResult, ownersResult] = await Promise.all([
@@ -417,7 +492,10 @@ export default function Scoreboard() {
 
       setOwnerRankings(sortedOwners)
       setGames(processedGames)
+      
+      // Reset loading state and background refresh flag
       setLoading(false)
+      isBackgroundRefresh.current = false
       
       console.log('=== SCOREBOARD DATA LOAD COMPLETE ===')
       console.log('Final results:', sortedOwners.length, 'owners,', processedGames.length, 'games')
@@ -425,6 +503,7 @@ export default function Scoreboard() {
     } catch (error) {
       console.error('Error in loadData:', error)
       setLoading(false)
+      isBackgroundRefresh.current = false
     }
   }
 
@@ -477,7 +556,7 @@ export default function Scoreboard() {
 
   const weekOptions = Array.from({ length: 18 }, (_, i) => i + 1)
 
-  if (loading) {
+  if (loading || selectedWeek === null) {
     return (
       <div className="min-h-screen bg-gray-50 flex justify-center items-center">
         <div className="text-center">
@@ -503,6 +582,11 @@ export default function Scoreboard() {
               </a>
               <h1 className="text-3xl font-bold text-gray-900">
                 Week {selectedWeek} Scoreboard
+                {selectedWeek === currentWeek && (
+                  <span className="ml-2 text-sm font-normal text-blue-600">
+                    (Live Updates)
+                  </span>
+                )}
               </h1>
               <div className="w-20"></div>
             </div>
@@ -519,7 +603,7 @@ export default function Scoreboard() {
               >
                 {weekOptions.map(week => (
                   <option key={week} value={week}>
-                    {week}
+                    {week} {week === currentWeek ? '(Current)' : ''}
                   </option>
                 ))}
               </select>
@@ -535,7 +619,7 @@ export default function Scoreboard() {
             {ownerRankings.map((owner) => (
               <div
                 key={owner.id}
-                className={`p-4 rounded-lg border-2 ${
+                className={`p-4 rounded-lg border-2 transition-all duration-300 ${
                   owner.rank === 1 
                     ? 'bg-yellow-50 border-yellow-400' 
                     : 'bg-white border-gray-200'
@@ -568,7 +652,7 @@ export default function Scoreboard() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Games</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {games.map((game) => (
-              <div key={game.id} className="bg-white rounded-lg border shadow p-3">
+              <div key={game.id} className="bg-white rounded-lg border shadow p-3 transition-all duration-300">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-semibold text-gray-700">
                     {formatGameTime(game.kickoff)}
