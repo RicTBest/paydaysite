@@ -4,7 +4,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
   const [season, setSeason] = useState(2025)
-  const [week, setWeek] = useState(2)
+  const [week, setWeek] = useState(4)
 
   useEffect(() => {
     getCurrentWeek()
