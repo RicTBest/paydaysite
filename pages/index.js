@@ -529,13 +529,6 @@ export default function Home() {
                 <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full w-fit">
                   Week {currentWeek} • {currentSeason} Season
                 </span>
-                {weekInfo && (
-                  <span className={`text-sm px-2 py-1 rounded-full w-fit ${
-                    userSelectedWeek ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                  }`}>
-                    {getWeekDisplayLogic()}
-                  </span>
-                )}
                 {lastUpdate && (
                   <span className="text-sm bg-white px-2 py-1 rounded-full shadow w-fit">
                     🕐 Last updated: {lastUpdate.toLocaleTimeString()}
