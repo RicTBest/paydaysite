@@ -247,28 +247,53 @@ export default function Home() {
     })
     allTeams.sort((a, b) => b.earnings - a.earnings)
     
-    const earningsRanges = []
-    allTeams.forEach(team => {
-      if (!earningsRanges.find(range => range.earnings === team.earnings)) {
-        earningsRanges.push({ earnings: team.earnings })
+  // Sort all teams by earnings (highest to lowest)
+  allTeams.sort((a, b) => b.earnings - a.earnings)
+  
+  // Calculate quintile boundaries based on team positions, not unique values
+  const totalTeams = allTeams.length
+  const quintileBoundaries = [
+    Math.ceil(totalTeams * 0.2), // Top 20%
+    Math.ceil(totalTeams * 0.4), // Top 40% 
+    Math.ceil(totalTeams * 0.6), // Top 60%
+    Math.ceil(totalTeams * 0.8), // Top 80%
+    totalTeams                    // Bottom 100%
+  ]
+
+  // Assign quintiles based on team position, but ensure ties stay together
+  allTeams.forEach((team, index) => {
+    // Find which quintile this position falls into
+    let quintile = 5 // Default to bottom quintile
+    for (let i = 0; i < quintileBoundaries.length; i++) {
+      if (index < quintileBoundaries[i]) {
+        quintile = i + 1
+        break
       }
-    })
-    earningsRanges.sort((a, b) => b.earnings - a.earnings)
+    }
     
-    earningsRanges.forEach((range, index) => {
-      const percentile = (earningsRanges.length - index) / earningsRanges.length
-      range.performancePercentile = percentile
-    })
+    // But if there are ties, promote lower-positioned tied teams to higher quintile
+    const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
+    const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
     
-    allTeams.forEach(team => {
-      const range = earningsRanges.find(r => r.earnings === team.earnings)
-      team.performancePercentile = range.performancePercentile
-    })
+    // Recalculate quintile based on best position for this earnings group
+    for (let i = 0; i < quintileBoundaries.length; i++) {
+      if (bestPositionForThisEarning < quintileBoundaries[i]) {
+        quintile = i + 1
+        break
+      }
+    }
     
-    const teamPerformanceMap = {}
-    allTeams.forEach(team => {
-      teamPerformanceMap[team.abbr] = team.performancePercentile
-    })
+    // Convert quintile to percentile for your existing gradient logic
+    team.performancePercentile = quintile === 1 ? 0.9 :
+                                quintile === 2 ? 0.7 :
+                                quintile === 3 ? 0.5 :
+                                quintile === 4 ? 0.3 : 0.1
+  })
+  
+  const teamPerformanceMap = {}
+  allTeams.forEach(team => {
+    teamPerformanceMap[team.abbr] = team.performancePercentile
+  })
     
     sortedLeaderboard.forEach(owner => {
       owner.teamsSorted = Object.values(owner.teams)
