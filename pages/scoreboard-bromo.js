@@ -41,7 +41,7 @@ export default function BromoScoreboard() {
         2024: new Date('2024-09-03'), // Tuesday, Sept 3, 2024 (Labor Day was Sept 2)
         2025: new Date('2025-09-02'), // Tuesday, Sept 2, 2025 (Labor Day is Sept 1)
         2026: new Date('2026-09-08'), // Tuesday, Sept 8, 2026 (Labor Day is Sept 7)
-        2027: new Date('2026-09-07'), // Tuesday, Sept 7, 2027 (Labor Day is Sept 6)
+        2027: new Date('2027-09-07'), // Tuesday, Sept 7, 2027 (Labor Day is Sept 6)
         2028: new Date('2028-09-05'), // Tuesday, Sept 5, 2028 (Labor Day is Sept 4)
         2029: new Date('2029-09-04'), // Tuesday, Sept 4, 2029 (Labor Day is Sept 3)
         2030: new Date('2030-09-03'), // Tuesday, Sept 3, 2030 (Labor Day is Sept 2)
@@ -506,7 +506,7 @@ export default function BromoScoreboard() {
       // Log final bromo owner totals
       Object.values(ownerTotals).forEach(owner => {
         if (owner.oboCount > 0 || owner.dboCount > 0 || owner.total > 0) {
-          console.log(`Bromo ${owner.name}: $${owner.total} (OBO: ${owner.oboCount}, DBO: ${owner.dboCount})`)
+          console.log(`Bromo ${owner.name}: ${owner.total} (OBO: ${owner.oboCount}, DBO: ${owner.dboCount})`)
         }
       })
 
@@ -796,4 +796,3 @@ export default function BromoScoreboard() {
       </div>
     </div>
   )
-}
