@@ -8,48 +8,321 @@ export default function Home() {
   const [games, setGames] = useState({})
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
-  const [currentWeek, setCurrentWeek] = useState(2)
+  const [currentWeek, setCurrentWeek] = useState(3)
+  const [actualWeek, setActualWeek] = useState(3)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [weekInfo, setWeekInfo] = useState(null)
+  const [userSelectedWeek, setUserSelectedWeek] = useState(false) // Track if user manually selected
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   useEffect(() => {
     loadCurrentWeek()
-    
-    // Set up auto-refresh every 5 minutes
+  }, [])
+
+  useEffect(() => {
+    // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
     const interval = setInterval(() => {
-      if (autoRefresh) {
+      if (autoRefresh && !userSelectedWeek) {
         console.log('Auto-refreshing data...')
         loadData()
       }
-    }, 5 * 60 * 1000) // 5 minutes
+    }, 1 * 60 * 1000)
 
     return () => {
       clearInterval(interval)
     }
-  }, [autoRefresh])
+  }, [autoRefresh, userSelectedWeek])
 
-  // Consolidated function to load games data
-  async function loadGames() {
-    console.log('=== STARTING LOADGAMES ===')
-    console.log('Current season:', currentSeason, 'Current week:', currentWeek)
+  // Function to change week manually - this is the key fix
+  function changeWeek(newWeek) {
+    if (newWeek >= 1 && newWeek <= 18 && newWeek !== currentWeek) {
+      console.log(`User manually changed week from ${currentWeek} to ${newWeek}`)
+      setCurrentWeek(newWeek)
+      setUserSelectedWeek(true) // Remember that user made a manual selection
+      
+      // Clear current data to show loading state
+      setGames({})
+      setProbabilities({})
+      setGooseData({})
+      
+      // Load data for the new week after state updates
+      setTimeout(() => {
+        loadDataForWeek(newWeek)
+      }, 100)
+    }
+  }
+
+  // Separate function to load data for a specific week
+  async function loadDataForWeek(weekNumber) {
+    console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
+    setLoading(true)
+    
+    try {
+      // Load all the base data first
+      const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
+      setLeaderboard(sortedLeaderboard)
+
+      // Then load week-specific data with the correct week number
+      await Promise.all([
+        loadProbabilitiesForWeek(teams, weekNumber),
+        loadGamesForWeek(weekNumber)
+      ])
+
+      // IMPORTANT: Load goose probabilities AFTER we have the correct probabilities
+      // We need to wait a bit for probabilities state to update
+      setTimeout(async () => {
+        await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
+        setLastUpdate(new Date())
+        setLoading(false)
+        console.log(`=== WEEK ${weekNumber} DATA LOAD COMPLETE ===`)
+      }, 500)
+
+    } catch (error) {
+      console.error('Error loading data for week:', error)
+      setLoading(false)
+    }
+  }
+
+  // Modified loadData to use the current week in state
+  async function loadData() {
+    await loadDataForWeek(currentWeek)
+  }
+
+  // Extract base data loading (awards, owners, teams) into separate function
+  async function loadBaseData() {
+    let awards = []
+    try {
+      const { data: awardsData, error } = await supabase
+        .from('awards')
+        .select('*')
+        .eq('season', currentSeason)
+
+      if (error) {
+        console.warn('Awards table access denied - using empty data:', error)
+        awards = []
+      } else {
+        awards = awardsData || []
+      }
+    } catch (err) {
+      console.warn('Awards table error - using empty data:', err)
+      awards = []
+    }
+    
+    // Load bromo league specific teams and owners
+    const { data: teams } = await supabase
+      .from('teams_bromo')
+      .select('abbr, name, owner_id')
+      .eq('active', true)
+
+    const { data: owners } = await supabase
+      .from('owners_bromo')
+      .select('id, name, num_gooses')
+
+    const teamLookup = {}
+    const ownerLookup = {}
+    
+    teams?.forEach(team => {
+      teamLookup[team.abbr] = team
+    })
+    
+    owners?.forEach(owner => {
+      ownerLookup[owner.id] = owner
+    })
+
+    const ownerStats = {}
+    
+    // Process awards - since awards are shared, we need to map them to bromo league owners
+    awards?.forEach(award => {
+      // Check if this team exists in bromo league
+      const team = teamLookup[award.team_abbr]
+      if (!team) return // Skip if team doesn't exist in bromo league
+      
+      // Use the bromo team's owner_id (not the award's owner_id)
+      const ownerId = team.owner_id
+      const owner = ownerLookup[ownerId]
+      if (!owner) return
+      
+      const teamAbbr = award.team_abbr
+      
+      if (!ownerStats[ownerId]) {
+        ownerStats[ownerId] = {
+          id: ownerId,
+          name: owner.name,
+          num_gooses: owner.num_gooses,
+          totalEarnings: 0,
+          wins: 0,
+          obo: 0,
+          dbo: 0,
+          eoy: 0,
+          teams: {}
+        }
+      }
+      
+      if (!ownerStats[ownerId].teams[teamAbbr]) {
+        ownerStats[ownerId].teams[teamAbbr] = {
+          abbr: teamAbbr,
+          name: team.name,
+          earnings: 0,
+          wins: 0,
+          obo: 0,
+          dbo: 0,
+          eoy: 0
+        }
+      }
+      
+      const points = award.points || 1
+      const earnings = points * 5
+      
+      ownerStats[ownerId].totalEarnings += earnings
+      ownerStats[ownerId].teams[teamAbbr].earnings += earnings
+      
+      switch (award.type) {
+        case 'WIN':
+        case 'TIE_AWAY':
+          ownerStats[ownerId].wins += 1
+          ownerStats[ownerId].teams[teamAbbr].wins += 1
+          break
+        case 'OBO':
+          ownerStats[ownerId].obo += 1
+          ownerStats[ownerId].teams[teamAbbr].obo += 1
+          break
+        case 'DBO':
+          ownerStats[ownerId].dbo += 1
+          ownerStats[ownerId].teams[teamAbbr].dbo += 1
+          break
+        case 'COACH_FIRED':
+          ownerStats[ownerId].eoy += 1
+          ownerStats[ownerId].teams[teamAbbr].eoy += 1
+          break
+      }
+    })
+
+    // Add teams without awards
+    teams?.forEach(team => {
+      const owner = ownerLookup[team.owner_id]
+      if (!owner) return
+      
+      if (!ownerStats[team.owner_id]) {
+        ownerStats[team.owner_id] = {
+          id: team.owner_id,
+          name: owner.name,
+          totalEarnings: 0,
+          num_gooses: owner.num_gooses || 0,
+          wins: 0,
+          obo: 0,
+          dbo: 0,
+          eoy: 0,
+          teams: {}
+        }
+      }
+      
+      if (!ownerStats[team.owner_id].teams[team.abbr]) {
+        ownerStats[team.owner_id].teams[team.abbr] = {
+          abbr: team.abbr,
+          name: team.name,
+          earnings: 0,
+          wins: 0,
+          obo: 0,
+          dbo: 0,
+          eoy: 0
+        }
+      }
+    })
+
+    const sortedLeaderboard = Object.values(ownerStats)
+      .sort((a, b) => b.totalEarnings - a.totalEarnings)
+    
+    let currentRank = 1
+    sortedLeaderboard.forEach((owner, index) => {
+      if (index > 0 && owner.totalEarnings < sortedLeaderboard[index - 1].totalEarnings) {
+        currentRank = index + 1
+      }
+      owner.rank = currentRank
+    })
+    
+    // Calculate performance percentiles
+    const allTeams = []
+    sortedLeaderboard.forEach(owner => {
+      Object.values(owner.teams).forEach(team => {
+        allTeams.push({ ...team, ownerName: owner.name })
+      })
+    })
+    allTeams.sort((a, b) => b.earnings - a.earnings)
+    
+  // Sort all teams by earnings (highest to lowest)
+  allTeams.sort((a, b) => b.earnings - a.earnings)
+  
+  // Calculate quintile boundaries based on team positions, not unique values
+  const totalTeams = allTeams.length
+  const quintileBoundaries = [
+    Math.ceil(totalTeams * 0.2), // Top 20%
+    Math.ceil(totalTeams * 0.4), // Top 40% 
+    Math.ceil(totalTeams * 0.6), // Top 60%
+    Math.ceil(totalTeams * 0.8), // Top 80%
+    totalTeams                    // Bottom 100%
+  ]
+
+  // Assign quintiles based on team position, but ensure ties stay together
+  allTeams.forEach((team, index) => {
+    // Find which quintile this position falls into
+    let quintile = 5 // Default to bottom quintile
+    for (let i = 0; i < quintileBoundaries.length; i++) {
+      if (index < quintileBoundaries[i]) {
+        quintile = i + 1
+        break
+      }
+    }
+    
+    // But if there are ties, promote lower-positioned tied teams to higher quintile
+    const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
+    const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
+    
+    // Recalculate quintile based on best position for this earnings group
+    for (let i = 0; i < quintileBoundaries.length; i++) {
+      if (bestPositionForThisEarning < quintileBoundaries[i]) {
+        quintile = i + 1
+        break
+      }
+    }
+    
+    // Convert quintile to percentile for your existing gradient logic
+    team.performancePercentile = quintile === 1 ? 0.9 :
+                                quintile === 2 ? 0.7 :
+                                quintile === 3 ? 0.5 :
+                                quintile === 4 ? 0.3 : 0.1
+  })
+  
+  const teamPerformanceMap = {}
+  allTeams.forEach(team => {
+    teamPerformanceMap[team.abbr] = team.performancePercentile
+  })
+    
+    sortedLeaderboard.forEach(owner => {
+      owner.teamsSorted = Object.values(owner.teams)
+        .sort((a, b) => b.earnings - a.earnings)
+        .map(team => ({
+          ...team,
+          performancePercentile: teamPerformanceMap[team.abbr] || 0
+        }))
+    })
+
+    return { ownerStats, teams, sortedLeaderboard }
+  }
+
+  async function loadGamesForWeek(weekNumber) {
+    console.log(`Loading games for Week ${weekNumber}`)
     try {
       const { data: gamesData, error: gamesError } = await supabase
         .from('games')
         .select('*')
         .eq('season', currentSeason)
-        .eq('week', currentWeek)
-
-      console.log('Games query completed. Error:', gamesError, 'Data count:', gamesData?.length)
-      console.log('Raw games data:', gamesData)
+        .eq('week', weekNumber)
 
       if (!gamesError && gamesData && gamesData.length > 0) {
-        console.log('Processing', gamesData.length, 'games...')
         const gameMap = {}
         
-        gamesData.forEach((game, index) => {
-          console.log(`Game ${index + 1}: ${game.home} vs ${game.away}, status: ${game.status}`)
-          
-          // Create enhanced status for each team
+        gamesData.forEach((game) => {
           const createEnhancedText = (isHome, opponent, status, kickoff, homeScore, awayScore) => {
             const base = isHome ? `vs ${opponent}` : `@ ${opponent}`
             
@@ -88,13 +361,10 @@ export default function Home() {
             return base
           }
 
-          // Determine game result for each team
           const getGameResult = (isHome, status, homeScore, awayScore) => {
             if (status !== 'STATUS_FINAL') return null
-            
             const myScore = isHome ? homeScore : awayScore
             const theirScore = isHome ? awayScore : homeScore
-            
             if (myScore > theirScore) return 'win'
             if (myScore < theirScore) return 'loss'
             return 'tie'
@@ -105,9 +375,6 @@ export default function Home() {
           
           const homeResult = getGameResult(true, game.status, game.home_pts, game.away_pts)
           const awayResult = getGameResult(false, game.status, game.home_pts, game.away_pts)
-          
-          console.log(`Home team ${game.home} enhanced text: "${homeText}"`)
-          console.log(`Away team ${game.away} enhanced text: "${awayText}"`)
           
           gameMap[game.home] = {
             opponent: game.away,
@@ -126,293 +393,45 @@ export default function Home() {
           }
         })
         
-        console.log('Final game map:', gameMap)
         setGames(gameMap)
-        console.log('Games state updated with enhanced status!')
-        console.log('=== LOADGAMES COMPLETE ===')
       } else {
-        console.log('No games data available - clearing games state')
-        setGames({}) // Clear games if no data
+        setGames({})
       }
     } catch (error) {
-      console.log('Error in loadGames:', error)
+      console.log('Error loading games:', error)
+      setGames({})
     }
   }
 
-  async function loadCurrentWeek() {
-    console.log('Loading current week...')
+  async function loadProbabilitiesForWeek(teams, weekNumber) {
     try {
-      const response = await fetch('/api/current-week')
+      console.log(`Loading probabilities for Week ${weekNumber}`)
+      const response = await fetch(`/api/kalshi-probabilities?week=${weekNumber}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        console.log('Current week API response:', data)
-        setCurrentSeason(data.season)
-        setCurrentWeek(data.week)
         
-        // Wait for state to update, then load data
-        setTimeout(() => {
-          loadData()
-        }, 100)
-      }
-    } catch (error) {
-      console.error('Error getting current week:', error)
-      // Fallback to loading data anyway
-      loadData()
-    }
-  }
-
-  async function loadData() {
-    console.log('=== STARTING LOADDATA ===')
-    console.log('Season:', currentSeason, 'Week:', currentWeek)
-    try {
-      setLoading(true)
-      
-      // Load awards (shared across all leagues)
-      let awards = []
-      try {
-        const { data: awardsData, error } = await supabase
-          .from('awards')
-          .select('*')
-          .eq('season', currentSeason)
-
-        if (error) {
-          console.warn('Awards table access denied - using empty data:', error)
-          awards = []
-        } else {
-          awards = awardsData || []
-        }
-      } catch (err) {
-        console.warn('Awards table error - using empty data:', err)
-        awards = []
-      }
-      
-      // Load bromo league specific teams and owners
-      const { data: teams } = await supabase
-        .from('teams_bromo')
-        .select('abbr, name, owner_id')
-        .eq('active', true)
-
-      const { data: owners } = await supabase
-        .from('owners_bromo')
-        .select('id, name, num_gooses')
-
-      // Create lookup maps
-      const teamLookup = {}
-      const ownerLookup = {}
-      
-      teams?.forEach(team => {
-        teamLookup[team.abbr] = team
-      })
-      
-      owners?.forEach(owner => {
-        ownerLookup[owner.id] = owner
-      })
-
-      // Create owner stats - this is where we need to map awards to bromo owners
-      const ownerStats = {}
-      
-      // Process awards - since awards are shared, we need to map them to bromo league owners
-      awards?.forEach(award => {
-        // Check if this team exists in bromo league
-        const team = teamLookup[award.team_abbr]
-        if (!team) return // Skip if team doesn't exist in bromo league
-        
-        // Use the bromo team's owner_id (not the award's owner_id)
-        const ownerId = team.owner_id
-        const owner = ownerLookup[ownerId]
-        if (!owner) return
-        
-        const teamAbbr = award.team_abbr
-        
-        if (!ownerStats[ownerId]) {
-          ownerStats[ownerId] = {
-            id: ownerId,
-            name: owner.name,
-            num_gooses: owner.num_gooses,
-            totalEarnings: 0,
-            wins: 0,
-            obo: 0,
-            dbo: 0,
-            eoy: 0,
-            teams: {}
-          }
-        }
-        
-        if (!ownerStats[ownerId].teams[teamAbbr]) {
-          ownerStats[ownerId].teams[teamAbbr] = {
-            abbr: teamAbbr,
-            name: team.name,
-            earnings: 0,
-            wins: 0,
-            obo: 0,
-            dbo: 0,
-            eoy: 0
-          }
-        }
-        
-        const points = award.points || 1
-        const earnings = points * 5
-        
-        ownerStats[ownerId].totalEarnings += earnings
-        ownerStats[ownerId].teams[teamAbbr].earnings += earnings
-        
-        switch (award.type) {
-          case 'WIN':
-          case 'TIE_AWAY':
-            ownerStats[ownerId].wins += 1
-            ownerStats[ownerId].teams[teamAbbr].wins += 1
-            break
-          case 'OBO':
-            ownerStats[ownerId].obo += 1
-            ownerStats[ownerId].teams[teamAbbr].obo += 1
-            break
-          case 'DBO':
-            ownerStats[ownerId].dbo += 1
-            ownerStats[ownerId].teams[teamAbbr].dbo += 1
-            break
-          case 'COACH_FIRED':
-            ownerStats[ownerId].eoy += 1
-            ownerStats[ownerId].teams[teamAbbr].eoy += 1
-            break
-        }
-      })
-
-      // Ensure all bromo teams have entries (even with 0 stats)
-      teams?.forEach(team => {
-        const owner = ownerLookup[team.owner_id]
-        if (!owner) return
-        
-        if (!ownerStats[team.owner_id]) {
-          ownerStats[team.owner_id] = {
-            id: team.owner_id,
-            name: owner.name,
-            totalEarnings: 0,
-            num_gooses: owner.num_gooses || 0,
-            wins: 0,
-            obo: 0,
-            dbo: 0,
-            eoy: 0,
-            teams: {}
-          }
-        }
-        
-        if (!ownerStats[team.owner_id].teams[team.abbr]) {
-          ownerStats[team.owner_id].teams[team.abbr] = {
-            abbr: team.abbr,
-            name: team.name,
-            earnings: 0,
-            wins: 0,
-            obo: 0,
-            dbo: 0,
-            eoy: 0
-          }
-        }
-      })
-
-      const sortedLeaderboard = Object.values(ownerStats)
-        .sort((a, b) => b.totalEarnings - a.totalEarnings)
-      
-      let currentRank = 1
-      sortedLeaderboard.forEach((owner, index) => {
-        if (index > 0 && owner.totalEarnings < sortedLeaderboard[index - 1].totalEarnings) {
-          currentRank = index + 1
-        }
-        owner.rank = currentRank
-      })
-      
-      const allTeams = []
-      sortedLeaderboard.forEach(owner => {
-        Object.values(owner.teams).forEach(team => {
-          allTeams.push({ ...team, ownerName: owner.name })
-        })
-      })
-      allTeams.sort((a, b) => b.earnings - a.earnings)
-      
-      // Create earnings ranges for gradient consistency (handles ties)
-      const earningsRanges = []
-      allTeams.forEach(team => {
-        if (!earningsRanges.find(range => range.earnings === team.earnings)) {
-          earningsRanges.push({ earnings: team.earnings })
-        }
-      })
-      earningsRanges.sort((a, b) => b.earnings - a.earnings)
-      
-      // Assign percentiles based on unique earnings values
-      earningsRanges.forEach((range, index) => {
-        const percentile = (earningsRanges.length - index) / earningsRanges.length
-        range.performancePercentile = percentile
-      })
-      
-      // Apply same percentile to teams with same earnings
-      allTeams.forEach(team => {
-        const range = earningsRanges.find(r => r.earnings === team.earnings)
-        team.performancePercentile = range.performancePercentile
-      })
-      
-      const teamPerformanceMap = {}
-      allTeams.forEach(team => {
-        teamPerformanceMap[team.abbr] = team.performancePercentile
-      })
-      
-      sortedLeaderboard.forEach(owner => {
-        owner.teamsSorted = Object.values(owner.teams)
-          .sort((a, b) => b.earnings - a.earnings)
-          .map(team => ({
-            ...team,
-            performancePercentile: teamPerformanceMap[team.abbr] || 0
-          }))
-      })
-      
-      setLeaderboard(sortedLeaderboard)
-
-      // Load all data in parallel
-      console.log('Loading probabilities, goose data, and games...')
-      await Promise.all([
-        loadProbabilities(teams),
-        loadGooseProbabilities(sortedLeaderboard),
-        loadGames()
-      ])
-      
-      console.log('All data loaded, games state should be updated')
-      setLastUpdate(new Date())
-      setLoading(false)
-      console.log('=== LOADDATA COMPLETE ===')
-    } catch (error) {
-      console.error('Error loading data:', error)
-      setLoading(false)
-    }
-  }
-
-  async function loadProbabilities(teams) {
-    try {
-      const response = await fetch(`/api/kalshi-probabilities?week=${currentWeek}&season=${currentSeason}`)
-      if (response.ok) {
-        const data = await response.json()
-        console.log(`Loading probabilities for Week ${currentWeek}:`, data.probabilities)
-        
-        // Set probability to 0 for teams without games (bye weeks)
         const adjustedProbabilities = { ...data.probabilities }
         
         teams?.forEach(team => {
-          if (!games[team.abbr] && !adjustedProbabilities[team.abbr]) {
+          if (!adjustedProbabilities[team.abbr]) {
             adjustedProbabilities[team.abbr] = { winProbability: 0, confidence: 'bye_week' }
           }
         })
         
         setProbabilities(adjustedProbabilities || {})
+        console.log(`Probabilities loaded for Week ${weekNumber}:`, Object.keys(adjustedProbabilities).length, 'teams')
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
+      setProbabilities({})
     }
   }
 
-  async function loadGooseProbabilities(owners) {
+  async function loadGooseProbabilitiesForWeek(owners, weekNumber) {
     try {
-      console.log('Starting goose probability calculation...')
-      console.log('Current probabilities state:', Object.keys(probabilities).length, 'teams have probabilities')
+      console.log(`Loading goose probabilities for Week ${weekNumber}`)
       
       const goosePromises = owners.map(async (owner) => {
-        // Pass current probabilities to avoid API making another Kalshi call
         const response = await fetch(`/api/goose-probability`, {
           method: 'POST',
           headers: {
@@ -420,15 +439,14 @@ export default function Home() {
           },
           body: JSON.stringify({
             owner_id: owner.id,
-            week: currentWeek,
-            season: currentSeason,
-            probabilities: probabilities // Pass fresh probabilities
+            week: weekNumber, // Use the specific week number
+            season: currentSeason
+            // Don't pass probabilities - let the API fetch them fresh for this week
           })
         })
         
         if (response.ok) {
           const data = await response.json()
-          console.log(`Goose data for ${owner.name}:`, data.goosePercentage, '- Reason:', data.reason)
           return { ownerId: owner.id, ...data }
         }
         console.error(`Goose API failed for ${owner.name}:`, response.status)
@@ -440,11 +458,75 @@ export default function Home() {
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
-      console.log('Final goose map:', gooseMap)
-      setGooseData(gooseMap)
+      setGooseData({}) // Clear old data first
+      setTimeout(() => {
+        setGooseData(gooseMap) // Set new data after brief delay
+      }, 50)
+      console.log(`Goose probabilities loaded for Week ${weekNumber}`)
     } catch (error) {
       console.error('Error loading goose probabilities:', error)
     }
+  }
+
+  async function loadCurrentWeek() {
+    console.log('Loading current week...')
+    try {
+      const [actualResponse, displayResponse] = await Promise.all([
+        fetch('/api/current-week'),
+        fetch('/api/current-week?display=true')
+      ])
+      
+      if (actualResponse.ok && displayResponse.ok) {
+        const actualData = await actualResponse.json()
+        const displayData = await displayResponse.json()
+        
+        console.log('Actual week:', actualData)
+        console.log('Display week:', displayData)
+        
+        setCurrentSeason(actualData.season)
+        setActualWeek(actualData.week)
+        
+        // Only use smart default on initial load, not if user has made a selection
+        if (isInitialLoad) {
+          setCurrentWeek(displayData.week) // This sets it to 4
+          setIsInitialLoad(false)
+        }
+        
+        setWeekInfo({
+          actual: actualData.week,
+          display: displayData.week,
+          dayOfWeek: displayData.dayOfWeek
+        })
+        
+        // FIXED: Use displayData.week directly instead of relying on state
+        setTimeout(() => {
+          loadDataForWeek(displayData.week) // Pass Week 4 directly
+        }, 100)
+      }
+    } catch (error) {
+      console.error('Error getting current week:', error)
+      loadData()
+    }
+  }
+
+  function getDayOfWeekName(dayOfWeek) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    return days[dayOfWeek] || 'Unknown'
+  }
+
+  function getWeekDisplayLogic() {
+    if (!weekInfo) return ''
+    
+    const dayName = getDayOfWeekName(weekInfo.dayOfWeek)
+    
+    if (userSelectedWeek) {
+      return `Manual selection: Week ${currentWeek}`
+    }
+    
+    if (weekInfo.actual !== weekInfo.display) {
+      return `${dayName}: Showing Week ${weekInfo.display} (NFL is currently in Week ${weekInfo.actual})`
+    }
+    return `${dayName}: Showing current NFL Week ${weekInfo.display}`
   }
 
   if (loading && leaderboard.length === 0) {
@@ -478,46 +560,92 @@ export default function Home() {
                   </span>
                 )}
                 <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow w-fit">
-                  <div className={`w-3 h-3 rounded-full animate-pulse ${autoRefresh ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                  <span className="text-sm font-medium">Live updates {autoRefresh ? 'ON' : 'OFF'}</span>
+                  <div className={`w-3 h-3 rounded-full animate-pulse ${autoRefresh && !userSelectedWeek ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                  <span className="text-sm font-medium">
+                    Live updates {autoRefresh && !userSelectedWeek ? 'ON' : 'OFF'}
+                    {userSelectedWeek && ' (manual)'}
+                  </span>
                 </div>
               </div>
             </div>
             
-<div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-   <a
-    href="/scoreboard-bromo"
-    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
-  >
-    📅 Weekly View
-  </a>
+            <div className="flex flex-col space-y-3">
+              {/* Week Navigation */}
+              <div className="flex items-center space-x-2 bg-white rounded-xl px-4 py-2 shadow-lg">
+                <button
+                  onClick={() => changeWeek(currentWeek - 1)}
+                  disabled={currentWeek <= 1}
+                  className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold py-1 px-3 rounded transition-colors text-sm"
+                >
+                  ← Prev
+                </button>
+                <select
+                  value={currentWeek}
+                  onChange={(e) => changeWeek(parseInt(e.target.value))}
+                  className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded text-sm min-w-[90px] text-center"
+                >
+                  {Array.from({ length: 18 }, (_, i) => i + 1).map(w => (
+                    <option key={w} value={w}>Week {w}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => changeWeek(currentWeek + 1)}
+                  disabled={currentWeek >= 18}
+                  className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold py-1 px-3 rounded transition-colors text-sm"
+                >
+                  Next →
+                </button>
+              </div>
 
-        <a
-    href="/minimal-bromo"
-    className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
-  >
-    📊 Minimal
-  </a>
-  
-  <button 
-    onClick={() => setAutoRefresh(!autoRefresh)}
-    className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
-      autoRefresh 
-        ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
-        : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
-    }`}
-  >
-    🔄 Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
-  </button>
-  
-  <button 
-    onClick={loadData}
-    disabled={loading}
-    className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
-  >
-    {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
-    <span>🔄 REFRESH</span>
-  </button>
+              {/* Reset to Smart Default */}
+              {userSelectedWeek && weekInfo && (
+                <button
+                  onClick={() => {
+                    setUserSelectedWeek(false)
+                    changeWeek(weekInfo.display)
+                  }}
+                  className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium py-1 px-3 rounded text-sm transition-colors"
+                >
+                  Reset to Smart Default (Week {weekInfo.display})
+                </button>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                <a
+                  href="/scoreboard-bromo"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+                >
+                  📅 Scoreboard
+                </a>
+
+                <a
+                  href="/minimal-bromo"
+                  className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+                >
+                  📊 Minimal
+                </a>
+                
+                <button 
+                  onClick={() => setAutoRefresh(!autoRefresh)}
+                  className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
+                    autoRefresh 
+                      ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
+                      : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
+                  }`}
+                >
+                  🔄 Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+                </button>
+                
+                <button 
+                  onClick={loadData}
+                  disabled={loading}
+                  className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
+                >
+                  {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
+                  <span>🔄 REFRESH</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -599,8 +727,8 @@ export default function Home() {
                       </div>
                       
                       <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
-                        goose.gooseProbability > 0.3 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
-                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
+                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
+                        goose.gooseProbability > 0.05 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
                         'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
                       }`}>
                         🥚 Goose Risk: {goose.goosePercentage || '0%'}
@@ -627,18 +755,9 @@ export default function Home() {
                       const game = games[team.abbr]
                       const winPercentage = prob ? (prob.winProbability * 100).toFixed(0) : 'N/A'
                       
-                      // Debug logging for each team
-                      if (team.abbr === 'BUF' || team.abbr === 'KC' || team.abbr === 'LAR') {
-                        console.log(`=== RENDERING ${team.abbr} ===`)
-                        console.log('Game data:', game)
-                        console.log('Enhanced status:', game?.enhancedStatus)
-                        console.log('All games keys:', Object.keys(games))
-                      }
-                      
                       const gameIsComplete = game?.status === 'STATUS_FINAL'
-                      const showLiveProbability = prob && prob.confidence !== 'final' && !gameIsComplete && game // Only show if game exists
+                      const showLiveProbability = prob && prob.confidence !== 'final' && !gameIsComplete && game
                       
-                      // Handle bye weeks and split enhanced status
                       let opponentText = ''
                       let enhancedStatusText = ''
                       
@@ -647,8 +766,8 @@ export default function Home() {
                         enhancedStatusText = ''
                       } else {
                         const parts = game.enhancedStatus.split('|')
-                        opponentText = parts[0] // "vs LAR" or "@ KC"
-                        enhancedStatusText = parts[1] || '' // Everything after the "|"
+                        opponentText = parts[0]
+                        enhancedStatusText = parts[1] || ''
                       }
                       
                       const gameResultIcon = !gameIsComplete ? null :
