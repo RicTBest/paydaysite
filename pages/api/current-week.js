@@ -28,10 +28,13 @@ class NFLWeekCalculator {
       
       let displayWeek = week
       
-      // Smart logic: Sunday, Monday, Tuesday show previous week
-      if (dayOfWeek <= 2 && week > 1) {
-        displayWeek = week - 1
+      // Corrected logic:
+      // - Sunday, Monday, Tuesday (0, 1, 2): Show current week (games just finished)
+      // - Wednesday onwards (3, 4, 5, 6): Show next week (preparing for upcoming games)
+      if (dayOfWeek >= 3 && week < 18) {  // Wednesday onwards, show next week
+        displayWeek = week + 1
       }
+      // Otherwise (Sun, Mon, Tue) show current week as-is
       
       return {
         season: currentYear,
@@ -45,7 +48,7 @@ class NFLWeekCalculator {
       return { season: 2025, week: 3, seasonType: 2, actualWeek: 3 }
     }
   }
-
+  
   static calculateNFLWeek(date = new Date()) {
     const year = date.getFullYear()
     
