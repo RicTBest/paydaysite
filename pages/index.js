@@ -400,8 +400,12 @@ export default function Home() {
   }
 
   async function loadGooseProbabilitiesForWeek(owners, weekNumber) {
+
+    
     try {
       console.log(`Loading goose probabilities for Week ${weekNumber}`)
+
+
       
       const goosePromises = owners.map(async (owner) => {
         const response = await fetch(`/api/goose-probability`, {
@@ -430,7 +434,10 @@ export default function Home() {
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
-      setGooseData(gooseMap)
+      setGooseData({}) // Clear old data first
+      setTimeout(() => {
+        setGooseData(gooseMap) // Set new data after brief delay
+      }, 50)
       console.log(`Goose probabilities loaded for Week ${weekNumber}`)
     } catch (error) {
       console.error('Error loading goose probabilities:', error)
