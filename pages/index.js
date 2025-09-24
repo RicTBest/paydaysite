@@ -444,44 +444,44 @@ export default function Home() {
     }
   }
 
-  async function loadCurrentWeek() {
-    console.log('Loading current week...')
-    try {
-      const [actualResponse, displayResponse] = await Promise.all([
-        fetch('/api/current-week'),
-        fetch('/api/current-week?display=true')
-      ])
+async function loadCurrentWeek() {
+  console.log('Loading current week...')
+  try {
+    const [actualResponse, displayResponse] = await Promise.all([
+      fetch('/api/current-week'),
+      fetch('/api/current-week?display=true')
+    ])
+    
+    if (actualResponse.ok && displayResponse.ok) {
+      const actualData = await actualResponse.json()
+      const displayData = await displayResponse.json()
       
-      if (actualResponse.ok && displayResponse.ok) {
-        const actualData = await actualResponse.json()
-        const displayData = await displayResponse.json()
-        
-        console.log('Actual week:', actualData)
-        console.log('Display week:', displayData)
-        
-        setCurrentSeason(actualData.season)
-        setActualWeek(actualData.week)
-        
-        // Only use smart default on initial load, not if user has made a selection
-        if (isInitialLoad) {
-          setCurrentWeek(displayData.week)
-          setIsInitialLoad(false)
-        }
-        
-        setWeekInfo({
-          actual: actualData.week,
-          display: displayData.week,
-          dayOfWeek: displayData.dayOfWeek
-        })
-        
-        setTimeout(() => {
-          loadData()
-        }, 100)
+      console.log('Actual week:', actualData)
+      console.log('Display week:', displayData)
+      
+      setCurrentSeason(actualData.season)
+      setActualWeek(actualData.week)
+      
+      // Only use smart default on initial load, not if user has made a selection
+      if (isInitialLoad) {
+        setCurrentWeek(displayData.week) // This sets it to 4
+        setIsInitialLoad(false)
       }
-    } catch (error) {
-      console.error('Error getting current week:', error)
-      loadData()
+      
+      setWeekInfo({
+        actual: actualData.week,
+        display: displayData.week,
+        dayOfWeek: displayData.dayOfWeek
+      })
+      
+      // FIXED: Use displayData.week directly instead of relying on state
+      setTimeout(() => {
+        loadDataForWeek(displayData.week) // Pass Week 4 directly
+      }, 100)
     }
+  } catch (error) {
+    console.error('Error getting current week:', error)
+    loadData()
   }
 
   function getDayOfWeekName(dayOfWeek) {
