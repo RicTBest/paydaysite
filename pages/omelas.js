@@ -263,21 +263,37 @@ export default function Omelas() {
                    borderBottom: '80px solid #fbbf24'
                  }}>
             </div>
-            {/* Remove chimney - it didn't work well */}
           </div>
 
           {/* Attic/Top Floor */}
           <div className="relative -mt-2">
-            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 border-4 border-yellow-300 h-24 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/20 to-amber-300/20 animate-pulse"></div>
+            <div className="bg-gradient-to-r from-yellow-400 to-amber-500 border-4 border-yellow-300 h-24 flex items-center justify-center relative overflow-hidden">
+              {/* Luxury effects */}
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-200/30 to-amber-300/30 animate-pulse"></div>
+              <div className="absolute top-1 left-2 w-2 h-2 bg-white rounded-full animate-ping opacity-75"></div>
+              <div className="absolute top-3 right-3 w-1 h-1 bg-white rounded-full animate-pulse"></div>
+              <div className="absolute bottom-2 left-4 w-1 h-1 bg-white rounded-full animate-ping delay-700"></div>
+              
+              {/* Luxury items scattered naturally */}
+              <div className="absolute top-2 left-8 text-lg">💎</div>
+              <div className="absolute bottom-3 right-6 text-lg">💰</div>
+              <div className="absolute top-4 right-12 text-lg">🏆</div>
+              <div className="absolute bottom-2 left-12 text-lg">💍</div>
+              <div className="absolute top-1 left-20 text-lg">✨</div>
+              <div className="absolute bottom-4 right-16 text-lg">💎</div>
+              <div className="absolute top-3 left-1/2 text-lg">💰</div>
               
               {/* Place top floor dweller */}
-              <div className="flex flex-wrap gap-4 items-center justify-center">
+              <div className="flex flex-wrap gap-4 items-center justify-center z-20 relative">
                 {leaderboard
                   .filter(owner => getFloorAssignment(owner) === 'penthouse')
                   .map(owner => (
-                    <div key={owner.id} className="flex flex-col items-center animate-bounce">
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getOwnerColor(owner.rank, leaderboard.length)} flex items-center justify-center text-white font-bold text-xs border-2 border-yellow-200 shadow-lg transform hover:scale-110 transition-transform`}>
+                    <div key={owner.id} className="flex flex-col items-center animate-bounce relative">
+                      {/* Crown on leader's head - make it bigger and more visible */}
+                      {owner.rank === 1 && (
+                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 text-2xl z-30 animate-pulse">👑</div>
+                      )}
+                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getOwnerColor(owner.rank, leaderboard.length)} flex items-center justify-center text-white font-bold text-xs border-2 border-yellow-200 shadow-lg transform hover:scale-110 transition-transform z-20`}>
                         {ownerInitials[owner.name] || owner.name.substring(0, 2).toUpperCase()}
                       </div>
                       <div className="text-xs font-bold text-yellow-900 mt-1 bg-yellow-200 px-1 py-0.5 rounded">
@@ -300,18 +316,18 @@ export default function Omelas() {
                 <div className="absolute inset-1 bg-gradient-to-br from-yellow-200 to-yellow-300 opacity-60"></div>
               </div>
               
-              {/* Furniture scattered naturally around the room */}
-              <div className="absolute bottom-4 left-6 text-sm transform -rotate-3">🛋️</div>
-              <div className="absolute bottom-3 right-8 text-sm transform rotate-12">📺</div>
-              <div className="absolute top-8 left-1/2 text-xs transform -rotate-6">💡</div>
-              <div className="absolute bottom-5 left-16 text-xs transform rotate-15">🪑</div>
-              <div className="absolute top-6 right-12 text-xs transform -rotate-8">📚</div>
-              <div className="absolute top-4 left-8 text-xs transform rotate-5">🖼️</div>
-              <div className="absolute bottom-6 right-16 text-xs transform -rotate-12">🪑</div>
-              <div className="absolute top-7 right-6 text-xs transform rotate-20">🌱</div>
+              {/* Furniture placed naturally on the ground/walls */}
+              <div className="absolute bottom-4 left-6 text-lg">🛋️</div>
+              <div className="absolute bottom-3 right-8 text-lg">📺</div>
+              <div className="absolute top-8 left-1/2 text-sm">💡</div>
+              <div className="absolute bottom-5 left-16 text-sm">🪑</div>
+              <div className="absolute top-4 left-8 text-sm">🖼️</div>
+              <div className="absolute bottom-6 right-16 text-sm">🪑</div>
+              <div className="absolute bottom-2 left-1/3 text-sm">📚</div>
+              <div className="absolute bottom-3 right-1/4 text-sm">🌱</div>
               
               {/* Place main floor dwellers */}
-              <div className="flex flex-wrap gap-2 items-center justify-center z-10 relative">
+              <div className="flex flex-wrap gap-2 items-center justify-center z-20 relative">
                 {leaderboard
                   .filter(owner => getFloorAssignment(owner) === 'first-floor')
                   .map((owner, index) => (
@@ -331,7 +347,7 @@ export default function Omelas() {
           </div>
 
           {/* Door */}
-          <div className="relative -mt-8 mx-auto w-12 h-8 bg-brown-600 border-2 border-brown-800 z-10">
+          <div className="relative -mt-8 mx-auto w-12 h-8 bg-amber-800 border-2 border-amber-900 z-10">
             <div className="absolute right-1 top-1/2 transform -translate-y-1/2 w-1 h-1 bg-yellow-400 rounded-full"></div>
           </div>
 
@@ -361,16 +377,18 @@ export default function Omelas() {
               <div className="absolute bottom-2 left-2 w-4 h-0.5 bg-gray-400/20 rounded-full animate-pulse"></div>
               <div className="absolute bottom-4 right-3 w-3 h-0.5 bg-gray-400/15 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
               
-              {/* Spiders and scary creatures */}
-              <div className="absolute top-1 left-1 text-xs opacity-70">🕷️</div>
-              <div className="absolute top-2 right-1 text-xs opacity-60">🕸️</div>
-              <div className="absolute bottom-1 left-1 text-xs opacity-50">🧌</div>
-              <div className="absolute bottom-2 right-2 text-xs opacity-60">🕷️</div>
-              <div className="absolute top-1 left-1/2 text-xs opacity-40">🦇</div>
-              <div className="absolute bottom-1 right-1/4 text-xs opacity-50">💀</div>
+              {/* Spiders and scary creatures scattered naturally */}
+              <div className="absolute top-2 left-3 text-xs opacity-70">🕷️</div>
+              <div className="absolute top-1 right-6 text-sm opacity-60">🕸️</div>
+              <div className="absolute bottom-3 left-5 text-sm opacity-50">🧌</div>
+              <div className="absolute bottom-2 right-8 text-xs opacity-60">🕷️</div>
+              <div className="absolute top-3 left-12 text-xs opacity-40">🦇</div>
+              <div className="absolute bottom-4 right-12 text-xs opacity-50">💀</div>
+              <div className="absolute top-4 right-3 text-xs opacity-35">🕸️</div>
+              <div className="absolute bottom-1 left-8 text-xs opacity-45">🕷️</div>
               
               {/* Place basement dwellers */}
-              <div className="flex flex-wrap gap-2 items-center justify-center">
+              <div className="flex flex-wrap gap-2 items-center justify-center z-20 relative">
                 {leaderboard
                   .filter(owner => getFloorAssignment(owner) === 'basement')
                   .map((owner, index) => (
