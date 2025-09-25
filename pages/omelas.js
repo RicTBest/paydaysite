@@ -263,7 +263,7 @@ export default function Omelas() {
                    borderBottom: '80px solid #fbbf24'
                  }}>
             </div>
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-16 h-12 bg-red-800 border-2 border-red-900"></div>
+            {/* Remove chimney - it didn't work well */}
           </div>
 
           {/* Attic/Top Floor */}
@@ -300,11 +300,18 @@ export default function Omelas() {
                 <div className="absolute inset-1 bg-gradient-to-br from-yellow-200 to-yellow-300 opacity-60"></div>
               </div>
               
-              {/* Warm light effects */}
-              <div className="absolute top-3 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-yellow-300 rounded-full opacity-75"></div>
+              {/* Furniture scattered naturally around the room */}
+              <div className="absolute bottom-4 left-6 text-sm transform -rotate-3">🛋️</div>
+              <div className="absolute bottom-3 right-8 text-sm transform rotate-12">📺</div>
+              <div className="absolute top-8 left-1/2 text-xs transform -rotate-6">💡</div>
+              <div className="absolute bottom-5 left-16 text-xs transform rotate-15">🪑</div>
+              <div className="absolute top-6 right-12 text-xs transform -rotate-8">📚</div>
+              <div className="absolute top-4 left-8 text-xs transform rotate-5">🖼️</div>
+              <div className="absolute bottom-6 right-16 text-xs transform -rotate-12">🪑</div>
+              <div className="absolute top-7 right-6 text-xs transform rotate-20">🌱</div>
               
               {/* Place main floor dwellers */}
-              <div className="flex flex-wrap gap-2 items-center justify-center">
+              <div className="flex flex-wrap gap-2 items-center justify-center z-10 relative">
                 {leaderboard
                   .filter(owner => getFloorAssignment(owner) === 'first-floor')
                   .map((owner, index) => (
@@ -324,7 +331,7 @@ export default function Omelas() {
           </div>
 
           {/* Door */}
-          <div className="relative -mt-8 mx-auto w-12 h-8 bg-amber-800 border-2 border-amber-900 z-10">
+          <div className="relative -mt-8 mx-auto w-12 h-8 bg-brown-600 border-2 border-brown-800 z-10">
             <div className="absolute right-1 top-1/2 transform -translate-y-1/2 w-1 h-1 bg-yellow-400 rounded-full"></div>
           </div>
 
@@ -354,15 +361,13 @@ export default function Omelas() {
               <div className="absolute bottom-2 left-2 w-4 h-0.5 bg-gray-400/20 rounded-full animate-pulse"></div>
               <div className="absolute bottom-4 right-3 w-3 h-0.5 bg-gray-400/15 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
               
-              {/* Cobwebs */}
-              <div className="absolute top-0 left-0 w-2 h-2 opacity-30">
-                <div className="absolute top-0 left-0 w-2 h-0.5 bg-gray-400 rounded-full transform rotate-45"></div>
-                <div className="absolute top-0 left-0 w-2 h-0.5 bg-gray-400 rounded-full transform -rotate-45"></div>
-              </div>
-              <div className="absolute top-0 right-0 w-2 h-2 opacity-20">
-                <div className="absolute top-0 right-0 w-2 h-0.5 bg-gray-400 rounded-full transform rotate-45"></div>
-                <div className="absolute top-0 right-0 w-2 h-0.5 bg-gray-400 rounded-full transform -rotate-45"></div>
-              </div>
+              {/* Spiders and scary creatures */}
+              <div className="absolute top-1 left-1 text-xs opacity-70">🕷️</div>
+              <div className="absolute top-2 right-1 text-xs opacity-60">🕸️</div>
+              <div className="absolute bottom-1 left-1 text-xs opacity-50">🧌</div>
+              <div className="absolute bottom-2 right-2 text-xs opacity-60">🕷️</div>
+              <div className="absolute top-1 left-1/2 text-xs opacity-40">🦇</div>
+              <div className="absolute bottom-1 right-1/4 text-xs opacity-50">💀</div>
               
               {/* Place basement dwellers */}
               <div className="flex flex-wrap gap-2 items-center justify-center">
@@ -381,8 +386,6 @@ export default function Omelas() {
                           {'🥚'.repeat(owner.num_gooses)}
                         </div>
                       )}
-                      {/* Cold shivering effect */}
-                      <div className="text-blue-300 text-xs opacity-40 animate-pulse" style={{animationDelay: `${index * 0.5}s`}}>❄</div>
                     </div>
                   ))}
               </div>
