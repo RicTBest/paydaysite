@@ -124,12 +124,87 @@ export default function Omelas() {
     }
   }
 
-  // Determine floor placement based on rank
-  const getFloorAssignment = (rank, totalPlayers) => {
-    if (rank === 1) return 'penthouse'
-    if (rank === totalPlayers) return 'basement'
-    return 'first-floor'
+  // Determine floor placement based on earnings and rules
+  const getFloorAssignments = (leaderboard) => {
+    if (leaderboard.length === 0) return {}
+    
+    // Group by earnings (same earnings = same floor)
+    const earningsGroups = {}
+    leaderboard.forEach(owner => {
+      const earnings = owner.totalEarnings
+      if (!earningsGroups[earnings]) {
+        earningsGroups[earnings] = []
+      }
+      earningsGroups[earnings].push(owner)
+    })
+    
+    // Sort earnings groups from highest to lowest
+    const sortedEarnings = Object.keys(earningsGroups)
+      .map(e => parseInt(e))
+      .sort((a, b) => b - a)
+    
+    const assignments = {}
+    const floors = { penthouse: [], middle: [], basement: [] }
+    
+    // Try to assign groups to floors following the rules
+    for (let i = 0; i < sortedEarnings.length; i++) {
+      const earnings = sortedEarnings[i]
+      const group = earningsGroups[earnings]
+      
+      if (i === 0) {
+        // Highest earners - try for penthouse if possible
+        if (group.length === 1) {
+          floors.penthouse = group
+        } else {
+          // Multiple people tied for first - they go to middle
+          floors.middle = floors.middle.concat(group)
+        }
+      } else if (i === sortedEarnings.length - 1) {
+        // Lowest earners - try for basement but respect max 4 rule
+        if (floors.basement.length + group.length <= 4) {
+          floors.basement = floors.basement.concat(group)
+        } else {
+          // Too many for basement, put in middle
+          floors.middle = floors.middle.concat(group)
+        }
+      } else {
+        // Middle groups go to middle floor
+        floors.middle = floors.middle.concat(group)
+      }
+    }
+    
+    // Ensure at least one in penthouse
+    if (floors.penthouse.length === 0 && floors.middle.length > 0) {
+      // Move highest earner from middle to penthouse
+      const highestInMiddle = floors.middle.reduce((max, owner) => 
+        owner.totalEarnings > max.totalEarnings ? owner : max
+      )
+      floors.penthouse = [highestInMiddle]
+      floors.middle = floors.middle.filter(owner => owner.id !== highestInMiddle.id)
+    }
+    
+    // Ensure at least two in basement if possible without violating other rules
+    if (floors.basement.length < 2 && floors.middle.length > 1) {
+      // Move lowest earners from middle to basement
+      const sortedMiddle = floors.middle.sort((a, b) => a.totalEarnings - b.totalEarnings)
+      const toMove = Math.min(2 - floors.basement.length, floors.middle.length - 1, 4 - floors.basement.length)
+      
+      for (let i = 0; i < toMove; i++) {
+        floors.basement.push(sortedMiddle[i])
+      }
+      floors.middle = sortedMiddle.slice(toMove)
+    }
+    
+    // Create final assignments
+    floors.penthouse.forEach(owner => assignments[owner.id] = 'penthouse')
+    floors.middle.forEach(owner => assignments[owner.id] = 'first-floor')
+    floors.basement.forEach(owner => assignments[owner.id] = 'basement')
+    
+    return assignments
   }
+  
+  const floorAssignments = getFloorAssignments(leaderboard)
+  const getFloorAssignment = (owner) => floorAssignments[owner.id] || 'first-floor'
 
   // Get color based on performance
   const getOwnerColor = (rank, totalPlayers) => {
@@ -199,7 +274,7 @@ export default function Omelas() {
               {/* Place top floor dweller */}
               <div className="flex flex-wrap gap-4 items-center justify-center">
                 {leaderboard
-                  .filter(owner => getFloorAssignment(owner.rank, leaderboard.length) === 'penthouse')
+                  .filter(owner => getFloorAssignment(owner) === 'penthouse')
                   .map(owner => (
                     <div key={owner.id} className="flex flex-col items-center animate-bounce">
                       <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getOwnerColor(owner.rank, leaderboard.length)} flex items-center justify-center text-white font-bold text-xs border-2 border-yellow-200 shadow-lg transform hover:scale-110 transition-transform`}>
@@ -217,14 +292,21 @@ export default function Omelas() {
           {/* Main Floor */}
           <div className="relative">
             <div className="bg-gradient-to-r from-blue-400 to-blue-600 border-4 border-blue-300 border-t-0 h-32 flex items-center justify-center relative">
-              {/* Windows */}
-              <div className="absolute top-2 left-4 w-8 h-6 bg-blue-200 border border-blue-800 opacity-80"></div>
-              <div className="absolute top-2 right-4 w-8 h-6 bg-blue-200 border border-blue-800 opacity-80"></div>
+              {/* Comfortable home elements */}
+              <div className="absolute top-2 left-4 w-8 h-6 bg-blue-100 border border-blue-800 opacity-90">
+                <div className="absolute inset-1 bg-gradient-to-br from-yellow-200 to-yellow-300 opacity-60"></div>
+              </div>
+              <div className="absolute top-2 right-4 w-8 h-6 bg-blue-100 border border-blue-800 opacity-90">
+                <div className="absolute inset-1 bg-gradient-to-br from-yellow-200 to-yellow-300 opacity-60"></div>
+              </div>
+              
+              {/* Warm light effects */}
+              <div className="absolute top-3 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-yellow-300 rounded-full opacity-75"></div>
               
               {/* Place main floor dwellers */}
               <div className="flex flex-wrap gap-2 items-center justify-center">
                 {leaderboard
-                  .filter(owner => getFloorAssignment(owner.rank, leaderboard.length) === 'first-floor')
+                  .filter(owner => getFloorAssignment(owner) === 'first-floor')
                   .map((owner, index) => (
                     <div key={owner.id} className="flex flex-col items-center" style={{
                       animation: `float ${2 + index * 0.3}s ease-in-out infinite`
@@ -248,30 +330,59 @@ export default function Omelas() {
 
           {/* Basement */}
           <div className="relative mt-0">
-            <div className="bg-gradient-to-r from-gray-700 to-gray-900 border-4 border-gray-600 border-t-0 h-28 flex items-center justify-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-gray-900/40 to-black/40"></div>
+            <div className="bg-gradient-to-r from-slate-800 to-gray-900 border-4 border-gray-800 border-t-0 h-28 flex items-center justify-center relative overflow-hidden">
+              {/* Cold, damp effects */}
+              <div className="absolute inset-0 bg-gradient-to-b from-gray-900/60 to-black/80"></div>
               
-              {/* Small basement windows */}
-              <div className="absolute top-1 left-4 w-4 h-2 bg-gray-400 border border-gray-900 opacity-60"></div>
-              <div className="absolute top-1 right-4 w-4 h-2 bg-gray-400 border border-gray-900 opacity-60"></div>
+              {/* Dirty basement windows with condensation */}
+              <div className="absolute top-1 left-4 w-4 h-2 bg-gray-500 border border-gray-900 opacity-40">
+                <div className="absolute inset-0 bg-gradient-to-b from-gray-400 to-gray-600"></div>
+              </div>
+              <div className="absolute top-1 right-4 w-4 h-2 bg-gray-500 border border-gray-900 opacity-40">
+                <div className="absolute inset-0 bg-gradient-to-b from-gray-400 to-gray-600"></div>
+              </div>
               
-              {/* Place basement dweller */}
-              <div className="flex flex-wrap gap-4 items-center justify-center">
+              {/* Water stains and mold */}
+              <div className="absolute top-0 left-1/4 w-3 h-6 bg-gradient-to-b from-green-900/30 to-green-800/40 rounded-b-full opacity-60"></div>
+              <div className="absolute top-0 right-1/3 w-2 h-4 bg-gradient-to-b from-gray-700/40 to-gray-800/50 rounded-b-full opacity-70"></div>
+              
+              {/* Dripping water effect */}
+              <div className="absolute top-2 left-1/4 w-0.5 h-1 bg-gray-400 opacity-50 animate-pulse"></div>
+              <div className="absolute top-4 left-1/4 w-0.5 h-0.5 bg-gray-400 opacity-30 rounded-full animate-ping" style={{animationDelay: '1s'}}></div>
+              
+              {/* Cold air wisps */}
+              <div className="absolute bottom-2 left-2 w-4 h-0.5 bg-gray-400/20 rounded-full animate-pulse"></div>
+              <div className="absolute bottom-4 right-3 w-3 h-0.5 bg-gray-400/15 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
+              
+              {/* Cobwebs */}
+              <div className="absolute top-0 left-0 w-2 h-2 opacity-30">
+                <div className="absolute top-0 left-0 w-2 h-0.5 bg-gray-400 rounded-full transform rotate-45"></div>
+                <div className="absolute top-0 left-0 w-2 h-0.5 bg-gray-400 rounded-full transform -rotate-45"></div>
+              </div>
+              <div className="absolute top-0 right-0 w-2 h-2 opacity-20">
+                <div className="absolute top-0 right-0 w-2 h-0.5 bg-gray-400 rounded-full transform rotate-45"></div>
+                <div className="absolute top-0 right-0 w-2 h-0.5 bg-gray-400 rounded-full transform -rotate-45"></div>
+              </div>
+              
+              {/* Place basement dwellers */}
+              <div className="flex flex-wrap gap-2 items-center justify-center">
                 {leaderboard
-                  .filter(owner => getFloorAssignment(owner.rank, leaderboard.length) === 'basement')
-                  .map(owner => (
+                  .filter(owner => getFloorAssignment(owner) === 'basement')
+                  .map((owner, index) => (
                     <div key={owner.id} className="flex flex-col items-center animate-pulse">
-                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getOwnerColor(owner.rank, leaderboard.length)} flex items-center justify-center text-white font-bold text-xs border-2 border-red-800 shadow-2xl transform hover:scale-110 transition-transform`}>
+                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getOwnerColor(owner.rank, leaderboard.length)} flex items-center justify-center text-white font-bold text-xs border-2 border-red-900 shadow-2xl transform hover:scale-110 transition-transform opacity-90`}>
                         {ownerInitials[owner.name] || owner.name.substring(0, 2).toUpperCase()}
                       </div>
-                      <div className="text-xs font-bold text-red-100 mt-1 bg-red-900 px-1 py-0.5 rounded">
+                      <div className="text-xs font-bold text-red-200 mt-1 bg-red-900/80 px-1 py-0.5 rounded">
                         ${owner.totalEarnings}
                       </div>
                       {owner.num_gooses > 0 && (
-                        <div className="text-sm animate-bounce mt-1">
+                        <div className="text-xs animate-bounce mt-1 opacity-80">
                           {'🥚'.repeat(owner.num_gooses)}
                         </div>
                       )}
+                      {/* Cold shivering effect */}
+                      <div className="text-blue-300 text-xs opacity-40 animate-pulse" style={{animationDelay: `${index * 0.5}s`}}>❄</div>
                     </div>
                   ))}
               </div>
