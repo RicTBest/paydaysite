@@ -22,26 +22,14 @@ class NFLWeekCalculator {
     try {
       const now = new Date()
       const currentYear = now.getFullYear()
-      const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, etc.
       
       const { week, seasonType } = this.calculateNFLWeek(now)
       
-      let displayWeek = week
-      
-      // Corrected logic:
-      // - Sunday, Monday, Tuesday (0, 1, 2): Show current week (games just finished)
-      // - Wednesday onwards (3, 4, 5, 6): Show next week (preparing for upcoming games)
-      if (dayOfWeek >= 3 && week < 18) {  // Wednesday onwards, show next week
-        displayWeek = week + 1
-      }
-      // Otherwise (Sun, Mon, Tue) show current week as-is
-      
       return {
         season: currentYear,
-        week: displayWeek,
+        week: week,
         seasonType: seasonType,
-        actualWeek: week,
-        dayOfWeek: dayOfWeek
+        actualWeek: week
       }
     } catch (error) {
       console.error('Error getting default display week:', error)
@@ -52,44 +40,59 @@ class NFLWeekCalculator {
   static calculateNFLWeek(date = new Date()) {
     const year = date.getFullYear()
     
-    const seasonStartDates = {
-      2025: new Date('2025-09-05'),
-      2026: new Date('2026-09-10'),
-      2024: new Date('2024-09-05')
+    // Define the first Wednesday of each NFL season
+    // Week 1 starts on the Wednesday before the first game
+    const seasonStartWednesdays = {
+      2025: new Date('2025-09-03'), // Wednesday before 9/5 Thursday game
+      2026: new Date('2026-09-09'), // Wednesday before estimated start
+      2024: new Date('2024-09-04')  // Wednesday before 9/5 Thursday game
     }
     
-    let seasonStart = seasonStartDates[year]
-    if (!seasonStart) {
-      const laborDay = new Date(year, 8, 1)
-      while (laborDay.getDay() !== 1) {
+    let seasonStartWednesday = seasonStartWednesdays[year]
+    
+    // If we don't have a predefined date, calculate it
+    if (!seasonStartWednesday) {
+      // Find Labor Day (first Monday in September)
+      const laborDay = new Date(year, 8, 1) // September 1st
+      while (laborDay.getDay() !== 1) { // Find first Monday
         laborDay.setDate(laborDay.getDate() + 1)
       }
-      seasonStart = new Date(laborDay)
-      seasonStart.setDate(laborDay.getDate() + 3)
+      
+      // NFL typically starts the Thursday after Labor Day
+      // So we want the Wednesday before that Thursday
+      const firstGameDay = new Date(laborDay)
+      firstGameDay.setDate(laborDay.getDate() + 3) // Thursday after Labor Day
+      
+      seasonStartWednesday = new Date(firstGameDay)
+      seasonStartWednesday.setDate(firstGameDay.getDate() - 1) // Wednesday before
     }
     
-    const daysSinceStart = Math.floor((date - seasonStart) / (1000 * 60 * 60 * 24))
-    
-    if (daysSinceStart < 0) {
-      return { week: 1, seasonType: 1 }
+    // If the current date is before the season starts, return week 1
+    if (date < seasonStartWednesday) {
+      return { week: 1, seasonType: 1 } // Pre-season
     }
     
+    // Calculate days since the first Wednesday
+    const daysSinceStart = Math.floor((date - seasonStartWednesday) / (1000 * 60 * 60 * 24))
+    
+    // Each NFL week runs from Wednesday to Tuesday (7 days)
     const week = Math.floor(daysSinceStart / 7) + 1
     
+    // Determine season type based on week number
     if (week <= 18) {
       return { 
         week: week, 
-        seasonType: 2
+        seasonType: 2 // Regular season
       }
-    } else if (week <= 21) {
+    } else if (week <= 22) { // Weeks 19-22 for playoffs
       return {
         week: week - 18,
-        seasonType: 3
+        seasonType: 3 // Playoffs
       }
     } else {
       return {
         week: 1,
-        seasonType: 4
+        seasonType: 4 // Off-season
       }
     }
   }
