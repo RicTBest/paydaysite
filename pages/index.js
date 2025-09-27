@@ -34,10 +34,6 @@ useEffect(() => {
   }
 }, [autoRefresh, userSelectedWeek])
 
-    return () => {
-      clearInterval(interval)
-    }
-  }, [autoRefresh, userSelectedWeek])
 
   // Function to change week manually - this is the key fix
   function changeWeek(newWeek) {
