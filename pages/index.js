@@ -20,14 +20,19 @@ export default function Home() {
     loadCurrentWeek()
   }, [])
 
-  useEffect(() => {
-    // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
-    const interval = setInterval(() => {
-      if (autoRefresh && !userSelectedWeek) {
-        console.log('Auto-refreshing data...')
-        loadData()
-      }
-    }, 1 * 60 * 1000)
+useEffect(() => {
+  // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
+  const interval = setInterval(() => {
+    if (autoRefresh && !userSelectedWeek) {
+      console.log('Auto-refreshing data...')
+      loadCurrentWeek() // Changed from loadData() to loadCurrentWeek()
+    }
+  }, 1 * 60 * 1000)
+
+  return () => {
+    clearInterval(interval)
+  }
+}, [autoRefresh, userSelectedWeek])
 
     return () => {
       clearInterval(interval)
