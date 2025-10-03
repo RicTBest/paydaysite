@@ -9,6 +9,11 @@ export default async function handler(req, res) {
   } else {
     ({ owner_id, week, season } = req.query)
   }
+
+  // Validate required parameters
+  if (!owner_id) {
+    return res.status(400).json({ message: 'owner_id is required' })
+  }
   
   // Get current week/season if not provided
   if (!week || !season) {
@@ -33,7 +38,7 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Get owner's teams
+    // Get owner's active teams
     const { data: teams, error: teamsError } = await supabase
       .from('teams')
       .select('abbr, name')
@@ -41,6 +46,7 @@ export default async function handler(req, res) {
       .eq('active', true)
 
     if (teamsError) {
+      console.error('Error fetching teams:', teamsError)
       throw new Error(`Database error: ${teamsError.message}`)
     }
 
@@ -53,20 +59,31 @@ export default async function handler(req, res) {
       })
     }
 
-    // Check if owner already has a win THIS WEEK (not any week)
+    // Check if owner already has a win THIS WEEK
     const { data: wins, error: winsError } = await supabase
       .from('awards')
-      .select('*')
+      .select('id')
       .eq('season', season)
-      .eq('week', week) // Only check current week
+      .eq('week', week)
       .eq('owner_id', owner_id)
       .in('type', ['WIN', 'TIE_AWAY'])
+      .limit(1)
 
     if (winsError) {
+      console.error('Error checking wins:', winsError)
       throw new Error(`Database error checking wins: ${winsError.message}`)
     }
 
-    // Get games for this week to check matchups
+    if (wins && wins.length > 0) {
+      return res.status(200).json({ 
+        gooseProbability: 0,
+        goosePercentage: '0%',
+        reason: 'Already has a win this week',
+        teamDetails: []
+      })
+    }
+
+    // Get all games for this week
     const { data: games, error: gamesError } = await supabase
       .from('games')
       .select('home, away, final, home_pts, away_pts')
@@ -74,13 +91,31 @@ export default async function handler(req, res) {
       .eq('week', week)
 
     if (gamesError) {
+      console.error('Error fetching games:', gamesError)
       throw new Error(`Database error getting games: ${gamesError.message}`)
+    }
+
+    if (!games || games.length === 0) {
+      // No games this week - all teams on bye, all automatic losses
+      return res.status(200).json({ 
+        gooseProbability: 1,
+        goosePercentage: '100%',
+        reason: 'No games scheduled this week (all teams on bye)',
+        teamCount: teams.length,
+        teamDetails: teams.map(t => ({
+          team: t.abbr,
+          teamName: t.name,
+          onBye: true,
+          loseProbability: 1.0
+        })),
+        calculation: 'All teams on bye = 100% goose'
+      })
     }
 
     const ownerTeams = teams.map(t => t.abbr)
     
-    // Check if owner has teams playing each other (internal game = guaranteed win, so can't goose)
-    const hasInternalGame = games?.some(game => 
+    // Check if owner has teams playing each other (internal game = guaranteed win)
+    const hasInternalGame = games.some(game => 
       ownerTeams.includes(game.home) && ownerTeams.includes(game.away)
     )
 
@@ -105,89 +140,134 @@ export default async function handler(req, res) {
       console.log(`Goose calc: Using provided probabilities for ${Object.keys(probabilities).length} teams`)
     } else {
       // Fallback to fetching (for GET requests or when no probabilities provided)
-      const probResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/kalshi-probabilities?week=${week}&season=${season}`)
-      if (probResponse.ok) {
-        const probData = await probResponse.json()
-        probabilities = probData.probabilities || {}
-        console.log(`Goose calc: Fetched fresh probabilities for ${Object.keys(probabilities).length} teams`)
+      try {
+        const probResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/kalshi-probabilities?week=${week}&season=${season}`)
+        if (probResponse.ok) {
+          const probData = await probResponse.json()
+          probabilities = probData.probabilities || {}
+          console.log(`Goose calc: Fetched fresh probabilities for ${Object.keys(probabilities).length} teams`)
+        } else {
+          console.error('Failed to get probabilities for goose calculation')
+        }
+      } catch (error) {
+        console.error('Error fetching probabilities:', error)
+      }
+    }
+
+    // Separate teams into those playing and those on bye THIS WEEK
+    const teamsPlaying = []
+    const teamsOnBye = []
+
+    for (const team of teams) {
+      const game = games.find(g => g.home === team.abbr || g.away === team.abbr)
+      if (game) {
+        teamsPlaying.push({ ...team, game })
       } else {
-        console.error('Failed to get probabilities for goose calculation')
+        teamsOnBye.push(team)
       }
     }
 
     // Calculate goose probability
-    // Goose happens when ALL of the owner's teams lose
-    // So goose probability = product of (1 - win_probability) for each team
+    // Teams on bye = automatic loss (probability 1.0)
+    // Teams playing = probability they lose (1 - win_probability)
     
     let gooseProb = 1
-    let teamsPlayed = 0
+    let gamesFinished = 0
     const teamDetails = []
     
-    for (const team of teams) {
+    // Process teams on bye (automatic losses)
+    for (const team of teamsOnBye) {
+      teamDetails.push({
+        team: team.abbr,
+        teamName: team.name,
+        onBye: true,
+        winProbability: 0,
+        loseProbability: 1.0,
+        source: 'bye_week'
+      })
+      // Multiply by 1.0 (no effect, but conceptually these are guaranteed losses)
+      gooseProb *= 1.0
+    }
+    
+    // Process teams playing this week
+    for (const team of teamsPlaying) {
       const teamAbbr = team.abbr
+      const game = team.game
       const prob = probabilities[teamAbbr]
       
-      // Use team probability if available, otherwise calculate fallback
-      let winProb = 0.5
-      if (prob && prob.confidence !== 'fallback') {
-        winProb = prob.winProbability
-      } else {
-        // Calculate a reasonable probability based on team strength
-        const TEAM_STRENGTH = {
-          'KC': 0.75, 'BUF': 0.73, 'SF': 0.72, 'PHI': 0.70, 'DAL': 0.68,
-          'BAL': 0.69, 'MIA': 0.65, 'CIN': 0.64, 'LAC': 0.62, 'NYJ': 0.45, // NYJ is weak
-          'MIN': 0.61, 'DET': 0.60, 'SEA': 0.59, 'GB': 0.63, 'JAX': 0.47,
-          'LAR': 0.57, 'LV': 0.49, 'PIT': 0.56, 'TEN': 0.44, 'IND': 0.46,
-          'ATL': 0.43, 'TB': 0.42, 'NO': 0.41, 'WSH': 0.40, 'NYG': 0.35,
-          'CHI': 0.38, 'NE': 0.33, 'DEN': 0.39, 'CLE': 0.32, 'CAR': 0.30,
-          'ARI': 0.36, 'HOU': 0.37, 'WAS': 0.40, 'JAC': 0.47
-        }
-        winProb = TEAM_STRENGTH[teamAbbr] || 0.5
-      }
-      
-      const loseProb = 1 - winProb
-      gooseProb *= loseProb
-      
-      teamDetails.push({
-        team: teamAbbr,
-        teamName: team.name,
-        winProbability: winProb,
-        loseProbability: loseProb,
-        source: prob ? prob.confidence : 'estimated'
-      })
-      
-      // Find opponent for context
-      const game = games?.find(g => g.home === teamAbbr || g.away === teamAbbr)
-      if (game) {
-        const opponent = game.home === teamAbbr ? game.away : game.home
-        teamDetails[teamDetails.length - 1].opponent = opponent
-        teamDetails[teamDetails.length - 1].game = `${game.away} @ ${game.home}`
+      // Check if game is already finished
+      if (game.final) {
+        const teamWon = (game.home === teamAbbr && game.home_pts > game.away_pts) ||
+                       (game.away === teamAbbr && game.away_pts > game.home_pts)
         
-        if (game.final) {
-          teamsPlayed += 1
-          // Game is over, we know the result
-          const teamWon = (game.home === teamAbbr && game.home_pts > game.away_pts) ||
-                         (game.away === teamAbbr && game.away_pts >= game.home_pts)
-          teamDetails[teamDetails.length - 1].actualResult = teamWon ? 'WIN' : 'LOSS'
-          
-          // If any game is already won, goose probability is 0
-          if (teamWon) {
-            gooseProb = 0
-            break
-          }
+        teamDetails.push({
+          team: teamAbbr,
+          teamName: team.name,
+          opponent: game.home === teamAbbr ? game.away : game.home,
+          game: `${game.away} @ ${game.home}`,
+          actualResult: teamWon ? 'WIN' : 'LOSS',
+          winProbability: teamWon ? 1 : 0,
+          loseProbability: teamWon ? 0 : 1,
+          source: 'game_finished'
+        })
+        
+        gamesFinished++
+        
+        // If team won, goose is impossible
+        if (teamWon) {
+          gooseProb = 0
+          break
+        } else {
+          // Team lost, multiply by 1 (certain loss)
+          gooseProb *= 1
         }
+      } else {
+        // Game not finished - use probability
+        let winProb = 0.5
+        
+        if (prob && prob.confidence !== 'fallback') {
+          winProb = prob.winProbability
+        } else {
+          // Fallback strength estimates
+          const TEAM_STRENGTH = {
+            'KC': 0.75, 'BUF': 0.73, 'SF': 0.72, 'PHI': 0.70, 'DAL': 0.68,
+            'BAL': 0.69, 'MIA': 0.65, 'CIN': 0.64, 'LAC': 0.62, 'NYJ': 0.45,
+            'MIN': 0.61, 'DET': 0.60, 'SEA': 0.59, 'GB': 0.63, 'JAX': 0.47,
+            'LAR': 0.57, 'LV': 0.49, 'PIT': 0.56, 'TEN': 0.44, 'IND': 0.46,
+            'ATL': 0.43, 'TB': 0.42, 'NO': 0.41, 'WSH': 0.40, 'NYG': 0.35,
+            'CHI': 0.38, 'NE': 0.33, 'DEN': 0.39, 'CLE': 0.32, 'CAR': 0.30,
+            'ARI': 0.36, 'HOU': 0.37, 'WAS': 0.40, 'JAC': 0.47
+          }
+          winProb = TEAM_STRENGTH[teamAbbr] || 0.5
+        }
+        
+        const loseProb = 1 - winProb
+        gooseProb *= loseProb
+        
+        const opponent = game.home === teamAbbr ? game.away : game.home
+        teamDetails.push({
+          team: teamAbbr,
+          teamName: team.name,
+          opponent: opponent,
+          game: `${game.away} @ ${game.home}`,
+          winProbability: winProb,
+          loseProbability: loseProb,
+          source: prob ? prob.confidence : 'estimated'
+        })
       }
     }
 
-    console.log(`Goose calc for owner ${owner_id}: ${teamDetails.length} teams, final prob: ${(gooseProb * 100).toFixed(2)}%`)
+    console.log(`Goose calc for owner ${owner_id}: ${teamsPlaying.length} playing, ${teamsOnBye.length} on bye, final prob: ${(gooseProb * 100).toFixed(2)}%`)
 
     res.status(200).json({ 
       gooseProbability: gooseProb,
       goosePercentage: `${(gooseProb * 100).toFixed(1)}%`,
-      reason: gooseProb > 0 ? `${teams.length - teamsPlayed} more teams must lose` : 'Cannot goose',
+      reason: gooseProb > 0 ? `${teamsPlaying.length - gamesFinished} more teams must lose` : 'Cannot goose',
       teamCount: teams.length,
+      teamsPlaying: teamsPlaying.length,
+      teamsOnBye: teamsOnBye.length,
       teamDetails,
-      calculation: `${teamDetails.map(t => `${((1-t.winProbability) * 100).toFixed(0)}%`).join(' × ')} = ${(gooseProb * 100).toFixed(1)}%`,
+      calculation: `${teamDetails.map(t => `${((t.loseProbability) * 100).toFixed(0)}%`).join(' × ')} = ${(gooseProb * 100).toFixed(1)}%`,
       dataSource: providedProbabilities ? 'provided_probabilities' : 'fetched_fresh'
     })
 
