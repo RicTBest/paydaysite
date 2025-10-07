@@ -13,84 +13,66 @@ export default function Home() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [weekInfo, setWeekInfo] = useState(null)
-  const [userSelectedWeek, setUserSelectedWeek] = useState(false) // Track if user manually selected
+  const [userSelectedWeek, setUserSelectedWeek] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [showRumToast, setShowRumToast] = useState(false)
 
   useEffect(() => {
     loadCurrentWeek()
+    // Show rum toast on load
+    setShowRumToast(true)
+    setTimeout(() => setShowRumToast(false), 5000)
   }, [])
 
-useEffect(() => {
-  // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
-  const interval = setInterval(() => {
-    if (autoRefresh && !userSelectedWeek) {
-      console.log('Auto-refreshing data...')
-      loadCurrentWeek() // Changed from loadData() to loadCurrentWeek()
-    }
-  }, 1 * 60 * 1000)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (autoRefresh && !userSelectedWeek) {
+        console.log('Auto-refreshing data...')
+        loadCurrentWeek()
+      }
+    }, 1 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [autoRefresh, userSelectedWeek])
 
-  return () => {
-    clearInterval(interval)
-  }
-}, [autoRefresh, userSelectedWeek])
-
-
-  // Function to change week manually - this is the key fix
   function changeWeek(newWeek) {
     if (newWeek >= 1 && newWeek <= 18 && newWeek !== currentWeek) {
       console.log(`User manually changed week from ${currentWeek} to ${newWeek}`)
       setCurrentWeek(newWeek)
-      setUserSelectedWeek(true) // Remember that user made a manual selection
-      
-      // Clear current data to show loading state
+      setUserSelectedWeek(true)
       setGames({})
       setProbabilities({})
       setGooseData({})
-      
-      // Load data for the new week after state updates
-      setTimeout(() => {
-        loadDataForWeek(newWeek)
-      }, 100)
+      setTimeout(() => loadDataForWeek(newWeek), 100)
     }
   }
 
-  // Separate function to load data for a specific week
   async function loadDataForWeek(weekNumber) {
     console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
     setLoading(true)
     
     try {
-      // Load all the base data first
       const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
       setLeaderboard(sortedLeaderboard)
-
-      // Then load week-specific data with the correct week number
       await Promise.all([
         loadProbabilitiesForWeek(teams, weekNumber),
         loadGamesForWeek(weekNumber)
       ])
-
-      // IMPORTANT: Load goose probabilities AFTER we have the correct probabilities
-      // We need to wait a bit for probabilities state to update
       setTimeout(async () => {
         await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
         setLastUpdate(new Date())
         setLoading(false)
         console.log(`=== WEEK ${weekNumber} DATA LOAD COMPLETE ===`)
       }, 500)
-
     } catch (error) {
       console.error('Error loading data for week:', error)
       setLoading(false)
     }
   }
 
-  // Modified loadData to use the current week in state
   async function loadData() {
     await loadDataForWeek(currentWeek)
   }
 
-  // Extract base data loading (awards, owners, teams) into separate function
   async function loadBaseData() {
     let awards = []
     try {
@@ -98,7 +80,6 @@ useEffect(() => {
         .from('awards')
         .select('*')
         .eq('season', currentSeason)
-
       if (error) {
         console.warn('Awards table access denied - using empty data:', error)
         awards = []
@@ -132,7 +113,6 @@ useEffect(() => {
 
     const ownerStats = {}
     
-    // Process awards
     awards?.forEach(award => {
       const team = teamLookup[award.team_abbr]
       if (!team) return
@@ -196,7 +176,6 @@ useEffect(() => {
       }
     })
 
-    // Add teams without awards
     teams?.forEach(team => {
       const owner = ownerLookup[team.owner_id]
       if (!owner) return
@@ -239,7 +218,6 @@ useEffect(() => {
       owner.rank = currentRank
     })
     
-    // Calculate performance percentiles
     const allTeams = []
     sortedLeaderboard.forEach(owner => {
       Object.values(owner.teams).forEach(team => {
@@ -248,53 +226,44 @@ useEffect(() => {
     })
     allTeams.sort((a, b) => b.earnings - a.earnings)
     
-  // Sort all teams by earnings (highest to lowest)
-  allTeams.sort((a, b) => b.earnings - a.earnings)
-  
-  // Calculate quintile boundaries based on team positions, not unique values
-  const totalTeams = allTeams.length
-  const quintileBoundaries = [
-    Math.ceil(totalTeams * 0.2), // Top 20%
-    Math.ceil(totalTeams * 0.4), // Top 40% 
-    Math.ceil(totalTeams * 0.6), // Top 60%
-    Math.ceil(totalTeams * 0.8), // Top 80%
-    totalTeams                    // Bottom 100%
-  ]
+    const totalTeams = allTeams.length
+    const quintileBoundaries = [
+      Math.ceil(totalTeams * 0.2),
+      Math.ceil(totalTeams * 0.4),
+      Math.ceil(totalTeams * 0.6),
+      Math.ceil(totalTeams * 0.8),
+      totalTeams
+    ]
 
-  // Assign quintiles based on team position, but ensure ties stay together
-  allTeams.forEach((team, index) => {
-    // Find which quintile this position falls into
-    let quintile = 5 // Default to bottom quintile
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (index < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+    allTeams.forEach((team, index) => {
+      let quintile = 5
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (index < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
-    
-    // But if there are ties, promote lower-positioned tied teams to higher quintile
-    const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
-    const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
-    
-    // Recalculate quintile based on best position for this earnings group
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (bestPositionForThisEarning < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+      
+      const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
+      const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
+      
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (bestPositionForThisEarning < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
+      
+      team.performancePercentile = quintile === 1 ? 0.9 :
+                                  quintile === 2 ? 0.7 :
+                                  quintile === 3 ? 0.5 :
+                                  quintile === 4 ? 0.3 : 0.1
+    })
     
-    // Convert quintile to percentile for your existing gradient logic
-    team.performancePercentile = quintile === 1 ? 0.9 :
-                                quintile === 2 ? 0.7 :
-                                quintile === 3 ? 0.5 :
-                                quintile === 4 ? 0.3 : 0.1
-  })
-  
-  const teamPerformanceMap = {}
-  allTeams.forEach(team => {
-    teamPerformanceMap[team.abbr] = team.performancePercentile
-  })
+    const teamPerformanceMap = {}
+    allTeams.forEach(team => {
+      teamPerformanceMap[team.abbr] = team.performancePercentile
+    })
     
     sortedLeaderboard.forEach(owner => {
       owner.teamsSorted = Object.values(owner.teams)
@@ -407,17 +376,13 @@ useEffect(() => {
       const response = await fetch(`/api/kalshi-probabilities?week=${weekNumber}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        
         const adjustedProbabilities = { ...data.probabilities }
-        
         teams?.forEach(team => {
           if (!adjustedProbabilities[team.abbr]) {
             adjustedProbabilities[team.abbr] = { winProbability: 0, confidence: 'bye_week' }
           }
         })
-        
         setProbabilities(adjustedProbabilities || {})
-        console.log(`Probabilities loaded for Week ${weekNumber}:`, Object.keys(adjustedProbabilities).length, 'teams')
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
@@ -426,84 +391,57 @@ useEffect(() => {
   }
 
   async function loadGooseProbabilitiesForWeek(owners, weekNumber) {
-
-    
     try {
       console.log(`Loading goose probabilities for Week ${weekNumber}`)
-
-
-      
       const goosePromises = owners.map(async (owner) => {
         const response = await fetch(`/api/goose-probability`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             owner_id: owner.id,
-            week: weekNumber, // Use the specific week number
+            week: weekNumber,
             season: currentSeason
-            // Don't pass probabilities - let the API fetch them fresh for this week
           })
         })
-        
         if (response.ok) {
           const data = await response.json()
           return { ownerId: owner.id, ...data }
         }
-        console.error(`Goose API failed for ${owner.name}:`, response.status)
         return { ownerId: owner.id, gooseProbability: 0, reason: 'Error loading' }
       })
-
       const gooseResults = await Promise.all(goosePromises)
       const gooseMap = {}
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
-      setGooseData({}) // Clear old data first
-      setTimeout(() => {
-        setGooseData(gooseMap) // Set new data after brief delay
-      }, 50)
-      console.log(`Goose probabilities loaded for Week ${weekNumber}`)
+      setGooseData({})
+      setTimeout(() => setGooseData(gooseMap), 50)
     } catch (error) {
       console.error('Error loading goose probabilities:', error)
     }
   }
 
   async function loadCurrentWeek() {
-    console.log('Loading current week...')
     try {
       const [actualResponse, displayResponse] = await Promise.all([
         fetch('/api/current-week'),
         fetch('/api/current-week?display=true')
       ])
-      
       if (actualResponse.ok && displayResponse.ok) {
         const actualData = await actualResponse.json()
         const displayData = await displayResponse.json()
-        
-        console.log('Actual week:', actualData)
-        console.log('Display week:', displayData)
-        
         setCurrentSeason(actualData.season)
         setActualWeek(actualData.week)
-        
-        // Only use smart default on initial load, not if user has made a selection
         if (isInitialLoad) {
-          setCurrentWeek(displayData.week) // This sets it to 4
+          setCurrentWeek(displayData.week)
           setIsInitialLoad(false)
         }
-        
         setWeekInfo({
           actual: actualData.week,
           display: displayData.week,
           dayOfWeek: displayData.dayOfWeek
         })
-        
-        // FIXED: Use displayData.week directly instead of relying on state
-        setTimeout(() => {
-          loadDataForWeek(displayData.week) // Pass Week 4 directly
-        }, 100)
+        setTimeout(() => loadDataForWeek(displayData.week), 100)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
@@ -511,58 +449,93 @@ useEffect(() => {
     }
   }
 
-  function getDayOfWeekName(dayOfWeek) {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    return days[dayOfWeek] || 'Unknown'
-  }
-
-  function getWeekDisplayLogic() {
-    if (!weekInfo) return ''
-    
-    const dayName = getDayOfWeekName(weekInfo.dayOfWeek)
-    
-    if (userSelectedWeek) {
-      return `Manual selection: Week ${currentWeek}`
-    }
-    
-    if (weekInfo.actual !== weekInfo.display) {
-      return `${dayName}: Showing Week ${weekInfo.display} (NFL is currently in Week ${weekInfo.actual})`
-    }
-    return `${dayName}: Showing current NFL Week ${weekInfo.display}`
-  }
-
   if (loading && leaderboard.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex justify-center items-center">
+      <div className="min-h-screen bg-gradient-to-br from-green-900 via-yellow-700 to-red-900 flex justify-center items-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <div className="text-xl font-semibold text-emerald-800">Loading Payday Football League...</div>
+          <div className="text-6xl mb-4 animate-bounce">🌴</div>
+          <div className="text-3xl font-black text-yellow-300 animate-pulse">Loading de Rasta Party...</div>
+          <div className="text-xl text-yellow-200 mt-2">Max be comin' mon! 🥥</div>
         </div>
       </div>
     )
   }
 
+  const isMaxInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes('max')
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-100 to-teal-200">
-      <div className="bg-white shadow-xl border-b-4 border-emerald-500 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-green-500/10"></div>
-        <div className="container mx-auto px-4 py-8 relative">
+    <div className="min-h-screen bg-gradient-to-br from-green-900 via-yellow-700 to-red-800 relative overflow-hidden">
+      {/* Floating palm trees */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-10 left-10 text-6xl opacity-20 animate-bounce" style={{animationDuration: '3s'}}>🌴</div>
+        <div className="absolute top-20 right-20 text-5xl opacity-15 animate-bounce" style={{animationDuration: '4s', animationDelay: '1s'}}>🥥</div>
+        <div className="absolute bottom-20 left-20 text-7xl opacity-10 animate-bounce" style={{animationDuration: '5s', animationDelay: '2s'}}>🌴</div>
+        <div className="absolute bottom-40 right-40 text-6xl opacity-15 animate-bounce" style={{animationDuration: '3.5s', animationDelay: '0.5s'}}>🍹</div>
+      </div>
+
+      {/* Rum & Coke Toast */}
+      {showRumToast && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-bounce">
+          <div className="bg-gradient-to-r from-amber-900 to-amber-800 text-yellow-100 px-6 py-4 rounded-2xl shadow-2xl border-4 border-yellow-400">
+            <div className="text-2xl font-black text-center">🍹 RAISE YER RUM & COKE TO JEFE MAX! 🍹</div>
+          </div>
+        </div>
+      )}
+
+      {/* Epic Rasta Banner */}
+      <div className="bg-gradient-to-r from-green-600 via-yellow-500 to-red-600 shadow-2xl border-b-8 border-black relative overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-20"></div>
+        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-transparent via-white to-transparent opacity-10"></div>
+        
+        <div className="container mx-auto px-4 py-8 relative z-10">
+          <div className="text-center space-y-4">
+            <div className="text-6xl sm:text-8xl font-black text-yellow-300 drop-shadow-2xl animate-bounce" style={{
+              textShadow: '4px 4px 0 #000, 8px 8px 20px rgba(0,0,0,0.8)',
+              WebkitTextStroke: '3px black'
+            }}>
+              🌴 JEFE DUN DECLARE A RASTA PARTY! 🌴
+            </div>
+            
+            <div className="text-3xl sm:text-5xl font-black text-white drop-shadow-lg">
+              🏴‍☠️ CARIBBEAN CAPTAIN MAX BE LEADIN' DE FLEET! 🏴‍☠️
+            </div>
+            
+            <div className="flex justify-center gap-4 text-4xl animate-pulse">
+              <span>🥥</span>
+              <span>🍹</span>
+              <span>⚓</span>
+              <span>🎵</span>
+              <span>🌊</span>
+            </div>
+
+            {isMaxInFirst && (
+              <div className="bg-gradient-to-r from-yellow-400 to-yellow-300 text-black px-8 py-4 rounded-full inline-block text-2xl font-black border-4 border-black shadow-2xl animate-pulse">
+                🏆 RARE JEFE SIGHTING - MAX IS IN THE LEAD! 🏆
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Header Section */}
+      <div className="bg-gradient-to-r from-black via-gray-900 to-black shadow-xl border-b-4 border-yellow-500 relative">
+        <div className="container mx-auto px-4 py-6 relative">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-6 lg:space-y-0">
             <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-emerald-800 mb-3 tracking-tight">
-                🏈 FOUNDERS (+ Max) LEAGUE
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-yellow-400 to-red-400 mb-3 tracking-tight">
+                🏈 FOUNDERS (+ Caribbean Legend Max) LEAGUE 🏴‍☠️
               </h1>
-              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-emerald-600">
-                <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full w-fit">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-yellow-300">
+                <span className="font-bold text-lg bg-gradient-to-r from-green-600 to-green-700 px-3 py-1 rounded-full w-fit border-2 border-yellow-400">
                   Week {currentWeek} • {currentSeason} Season
                 </span>
                 {lastUpdate && (
-                  <span className="text-sm bg-white px-2 py-1 rounded-full shadow w-fit">
+                  <span className="text-sm bg-black px-2 py-1 rounded-full shadow w-fit border border-yellow-400">
                     🕐 Last updated: {lastUpdate.toLocaleTimeString()}
                   </span>
                 )}
-                <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow w-fit">
-                  <div className={`w-3 h-3 rounded-full animate-pulse ${autoRefresh && !userSelectedWeek ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <div className="flex items-center space-x-2 bg-black px-3 py-1 rounded-full shadow w-fit border border-yellow-400">
+                  <div className={`w-3 h-3 rounded-full animate-pulse ${autoRefresh && !userSelectedWeek ? 'bg-green-400' : 'bg-gray-400'}`}></div>
                   <span className="text-sm font-medium">
                     Live updates {autoRefresh && !userSelectedWeek ? 'ON' : 'OFF'}
                     {userSelectedWeek && ' (manual)'}
@@ -572,19 +545,18 @@ useEffect(() => {
             </div>
             
             <div className="flex flex-col space-y-3">
-              {/* Week Navigation */}
-              <div className="flex items-center space-x-2 bg-white rounded-xl px-4 py-2 shadow-lg">
+              <div className="flex items-center space-x-2 bg-black rounded-xl px-4 py-2 shadow-lg border-2 border-yellow-500">
                 <button
                   onClick={() => changeWeek(currentWeek - 1)}
                   disabled={currentWeek <= 1}
-                  className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold py-1 px-3 rounded transition-colors text-sm"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:text-gray-400 text-yellow-200 font-bold py-1 px-3 rounded transition-colors text-sm border-2 border-yellow-500"
                 >
                   ← Prev
                 </button>
                 <select
                   value={currentWeek}
                   onChange={(e) => changeWeek(parseInt(e.target.value))}
-                  className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded text-sm min-w-[90px] text-center"
+                  className="bg-gradient-to-r from-green-600 to-green-700 text-yellow-200 font-bold px-3 py-1 rounded text-sm min-w-[90px] text-center border-2 border-yellow-500"
                 >
                   {Array.from({ length: 18 }, (_, i) => i + 1).map(w => (
                     <option key={w} value={w}>Week {w}</option>
@@ -593,47 +565,45 @@ useEffect(() => {
                 <button
                   onClick={() => changeWeek(currentWeek + 1)}
                   disabled={currentWeek >= 18}
-                  className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold py-1 px-3 rounded transition-colors text-sm"
+                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:text-gray-400 text-yellow-200 font-bold py-1 px-3 rounded transition-colors text-sm border-2 border-yellow-500"
                 >
                   Next →
                 </button>
               </div>
 
-              {/* Reset to Smart Default */}
               {userSelectedWeek && weekInfo && (
                 <button
                   onClick={() => {
                     setUserSelectedWeek(false)
                     changeWeek(weekInfo.display)
                   }}
-                  className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium py-1 px-3 rounded text-sm transition-colors"
+                  className="bg-yellow-500 hover:bg-yellow-600 text-black font-medium py-1 px-3 rounded text-sm transition-colors border-2 border-green-600"
                 >
-                  Reset to Smart Default (Week {weekInfo.display})
+                  Reset to Week {weekInfo.display} 🌴
                 </button>
               )}
 
-              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
                 <a
                   href="/scoreboard"
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base border-2 border-yellow-400"
                 >
                   📅 Scoreboard
                 </a>
 
                 <a
                   href="/minimal"
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+                  className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base border-2 border-yellow-400"
                 >
                   📊 Minimal
                 </a>
                 
                 <button 
                   onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
+                  className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base border-2 border-yellow-400 ${
                     autoRefresh 
-                      ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700' 
-                      : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
+                      ? 'bg-gradient-to-r from-green-600 to-green-700 text-yellow-200' 
+                      : 'bg-gradient-to-r from-gray-600 to-gray-700 text-white'
                   }`}
                 >
                   🔄 Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
@@ -642,15 +612,15 @@ useEffect(() => {
                 <button 
                   onClick={loadData}
                   disabled={loading}
-                  className="bg-gradient-to-r from-emerald-600 to-green-700 hover:from-emerald-700 hover:to-green-800 disabled:from-emerald-400 disabled:to-green-500 text-white font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base"
+                  className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 disabled:from-gray-600 disabled:to-gray-700 text-yellow-200 font-black py-3 px-4 sm:px-8 rounded-xl transition-all transform hover:scale-105 shadow-lg flex items-center justify-center space-x-2 text-sm sm:text-base border-2 border-yellow-400"
                 >
-                  {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>}
+                  {loading && <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-yellow-200"></div>}
                   <span>🔄 REFRESH</span>
                 </button>
                 
                 <a
                   href="/admin"
-                  className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base"
+                  className="bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-yellow-200 font-bold py-3 px-4 sm:px-6 rounded-xl transition-all transform hover:scale-105 shadow-lg text-center text-sm sm:text-base border-2 border-yellow-400"
                 >
                   ⚙️ Admin
                 </a>
@@ -660,7 +630,7 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 relative z-10">
         <div className="space-y-8">
           {leaderboard.map((owner, index) => {
             const goose = gooseData[owner.id] || {}
@@ -670,9 +640,10 @@ useEffect(() => {
             const gooseEggs = '🥚'.repeat(Math.max(0, numGooses))
             const isLeader = rank === 1
             const isTop3 = rank <= 3
+            const isMax = owner.name?.toLowerCase().includes('max')
             
             const getRankEmoji = (rank) => {
-              if (rank === 1) return '👑'
+              if (rank === 1) return isMax ? '🏴‍☠️👑⚓' : '👑'
               if (rank === 2) return '🥈'
               if (rank === 3) return '🥉'
               return ''
@@ -681,39 +652,55 @@ useEffect(() => {
             return (
               <div 
                 key={owner.id} 
-                className={`relative overflow-hidden rounded-2xl shadow-2xl transition-all hover:shadow-3xl transform hover:-translate-y-1 ${
-                  isLeader 
-                    ? 'bg-gradient-to-br from-yellow-100 via-yellow-50 to-amber-100 ring-4 ring-yellow-400' 
+                className={`relative overflow-hidden rounded-2xl shadow-2xl transition-all hover:shadow-3xl transform hover:-translate-y-1 border-4 ${
+                  isMax && isLeader
+                    ? 'bg-gradient-to-br from-yellow-200 via-green-100 to-red-100 ring-8 ring-yellow-400 animate-pulse border-yellow-500' 
+                    : isLeader 
+                    ? 'bg-gradient-to-br from-yellow-100 via-yellow-50 to-amber-100 ring-4 ring-yellow-400 border-yellow-400' 
                     : isTop3
-                    ? 'bg-gradient-to-br from-emerald-50 via-white to-green-50 ring-2 ring-emerald-200'
-                    : 'bg-gradient-to-br from-gray-50 via-white to-gray-50 ring-1 ring-gray-200'
+                    ? 'bg-gradient-to-br from-green-50 via-white to-yellow-50 ring-2 ring-green-300 border-green-400'
+                    : 'bg-gradient-to-br from-gray-50 via-white to-gray-50 ring-1 ring-gray-300 border-gray-300'
                 }`}
               >
                 <div className={`p-4 sm:p-6 ${
-                  isLeader 
+                  isMax && isLeader
+                    ? 'bg-gradient-to-r from-green-400 via-yellow-300 to-red-400 border-b-4 border-black' 
+                    : isLeader 
                     ? 'bg-gradient-to-r from-yellow-200 via-amber-100 to-yellow-200' 
                     : isTop3
-                    ? 'bg-gradient-to-r from-emerald-100 via-green-50 to-emerald-100'
+                    ? 'bg-gradient-to-r from-green-100 via-yellow-50 to-green-100'
                     : 'bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100'
                 }`}>
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                     <div className="flex items-center space-x-4 sm:space-x-6">
-                      <div className={`text-2xl sm:text-3xl font-black px-3 sm:px-4 py-2 rounded-full shadow-lg transform rotate-3 ${
-                        isLeader 
-                          ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-yellow-900' 
+                      <div className={`text-2xl sm:text-3xl font-black px-3 sm:px-4 py-2 rounded-full shadow-lg transform ${isMax && isLeader ? 'rotate-12 animate-spin' : 'rotate-3'} border-4 ${
+                        isMax && isLeader
+                          ? 'bg-gradient-to-br from-yellow-400 via-green-400 to-red-400 text-black border-black' 
+                          : isLeader 
+                          ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-yellow-900 border-yellow-600' 
                           : isTop3
-                          ? 'bg-gradient-to-br from-emerald-400 to-green-500 text-emerald-900'
-                          : 'bg-gradient-to-br from-gray-400 to-gray-500 text-gray-900'
-                      }`}>
+                          ? 'bg-gradient-to-br from-green-400 to-yellow-400 text-green-900 border-green-600'
+                          : 'bg-gradient-to-br from-gray-400 to-gray-500 text-gray-900 border-gray-600'
+                      }`} style={isMax && isLeader ? {animationDuration: '3s'} : {}}>
                         #{rank}
                       </div>
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
+                          {isMax && <span className="text-3xl">🌴🥥🍹</span>}
                           {gooseEggs && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{gooseEggs}</span>}
                           {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
-                        <div className="text-3xl sm:text-4xl font-black bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">
+                        {isMax && isLeader && (
+                          <div className="text-lg font-black text-green-800 animate-pulse">
+                            ⚓ DE CARIBBEAN CAPTAIN ⚓
+                          </div>
+                        )}
+                        <div className={`text-3xl sm:text-4xl font-black ${
+                          isMax && isLeader 
+                            ? 'bg-gradient-to-r from-green-600 via-yellow-500 to-red-600 bg-clip-text text-transparent'
+                            : 'bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent'
+                        }`}>
                           ${owner.totalEarnings}
                         </div>
                       </div>
@@ -721,37 +708,57 @@ useEffect(() => {
                     
                     <div className="flex flex-col sm:text-right space-y-3">
                       <div className="flex flex-wrap gap-2">
-                        <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                        <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow border-2 border-yellow-400">
                           🏆 {owner.wins}
                         </span>
-                        <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                        <span className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow border-2 border-yellow-400">
                           🔥 {owner.obo}
                         </span>
-                        <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                        <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow border-2 border-yellow-400">
                           🛡️ {owner.dbo}
                         </span>
-                        <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
+                        <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow border-2 border-yellow-400">
                           🏁 {owner.eoy}
                         </span>
                       </div>
                       
-                      <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
-                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
-                        goose.gooseProbability > 0.05 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
-                        'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                      <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit border-2 ${
+                        goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse border-yellow-400' :
+                        goose.gooseProbability > 0.05 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-yellow-400' :
+                        'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-yellow-400'
                       }`}>
                         🥚 Goose Risk: {goose.goosePercentage || '0%'}
                       </div>
                     </div>
                   </div>
                   
+                  {isMax && isLeader && (
+                    <div className="mt-4 p-4 bg-gradient-to-r from-yellow-300 via-green-300 to-red-300 border-4 border-black rounded-lg shadow-2xl">
+                      <div className="text-center space-y-2">
+                        <div className="text-2xl font-black text-black animate-pulse">
+                          🎉 MAX IS JEFE! SAVOR THE MOMENT! 🎉
+                        </div>
+                        <div className="text-lg font-bold text-gray-800">
+                          🍹 Time fi celebrate wit rum an' coke, Caribbean style! 🍹
+                        </div>
+                        <div className="flex justify-center gap-3 text-3xl animate-bounce">
+                          <span>🌴</span>
+                          <span>🥥</span>
+                          <span>⚓</span>
+                          <span>🏴‍☠️</span>
+                          <span>🎵</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {hasGooseRisk && (
-                    <div className="mt-4 p-3 sm:p-4 bg-gradient-to-r from-yellow-200 to-orange-200 border-l-4 border-yellow-500 rounded-lg shadow-lg">
+                    <div className="mt-4 p-3 sm:p-4 bg-gradient-to-r from-yellow-300 to-orange-300 border-l-4 border-red-600 rounded-lg shadow-lg">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                        <span className="font-black text-yellow-800 text-sm sm:text-lg">
-                          🚨 HIGH GOOSE ALERT: {goose.goosePercentage} chance of scoring 0 points! 🚨
+                        <span className="font-black text-red-800 text-sm sm:text-lg">
+                          🚨 HIGH GOOSE ALERT: {goose.goosePercentage} chance! 🚨
                         </span>
-                        <span className="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full w-fit">{goose.reason}</span>
+                        <span className="text-xs text-red-700 bg-red-100 px-2 py-1 rounded-full w-fit">{goose.reason}</span>
                       </div>
                     </div>
                   )}
@@ -763,7 +770,6 @@ useEffect(() => {
                       const prob = probabilities[team.abbr]
                       const game = games[team.abbr]
                       const winPercentage = prob ? (prob.winProbability * 100).toFixed(0) : 'N/A'
-                      
                       const gameIsComplete = game?.status === 'STATUS_FINAL'
                       const showLiveProbability = prob && prob.confidence !== 'final' && !gameIsComplete && game
                       
@@ -771,7 +777,7 @@ useEffect(() => {
                       let enhancedStatusText = ''
                       
                       if (!game) {
-                        opponentText = 'Bye Week'
+                        opponentText = 'Bye Week 🌴'
                         enhancedStatusText = ''
                       } else {
                         const parts = game.enhancedStatus.split('|')
@@ -784,18 +790,18 @@ useEffect(() => {
                         game?.result === 'tie' && !game?.isHome ? '✅' : '❌'
                       
                       const performanceGradient = 
-                        team.performancePercentile >= 0.8 ? 'from-emerald-600 to-green-600' :
+                        team.performancePercentile >= 0.8 ? 'from-green-600 to-yellow-500' :
                         team.performancePercentile >= 0.6 ? 'from-blue-600 to-indigo-600' :
                         team.performancePercentile >= 0.4 ? 'from-yellow-600 to-orange-600' :
                         team.performancePercentile >= 0.2 ? 'from-orange-600 to-red-600' :
                         'from-red-600 to-red-700'
                       
                       const performanceBorder = 
-                        team.performancePercentile >= 0.8 ? 'border-emerald-300 ring-2 ring-emerald-200' :
+                        team.performancePercentile >= 0.8 ? 'border-green-400 ring-2 ring-yellow-300' :
                         team.performancePercentile >= 0.6 ? 'border-blue-300 ring-2 ring-blue-200' :
-                        team.performancePercentile >= 0.4 ? 'border-yellow-300' :
-                        team.performancePercentile >= 0.2 ? 'border-orange-300' :
-                        'border-red-300'
+                        team.performancePercentile >= 0.4 ? 'border-yellow-400' :
+                        team.performancePercentile >= 0.2 ? 'border-orange-400' :
+                        'border-red-400'
                       
                       return (
                         <div key={team.abbr} className={`bg-white rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 ${performanceBorder}`}>
@@ -822,10 +828,10 @@ useEffect(() => {
                                 ${team.earnings}
                               </div>
                               {showLiveProbability && (
-                                <div className={`text-xs px-2 py-1 rounded-full font-bold shadow mt-1 ${
-                                  prob.winProbability > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-                                  prob.winProbability > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
-                                  'bg-gradient-to-r from-red-500 to-red-600 text-white'
+                                <div className={`text-xs px-2 py-1 rounded-full font-bold shadow mt-1 border ${
+                                  prob.winProbability > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-yellow-400' :
+                                  prob.winProbability > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-yellow-400' :
+                                  'bg-gradient-to-r from-red-500 to-red-600 text-white border-yellow-400'
                                 }`}>
                                   {winPercentage}%
                                 </div>
@@ -841,19 +847,19 @@ useEffect(() => {
                           </div>
                           
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1">
-                            <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2">
+                            <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2 border border-blue-200">
                               <div className="font-black text-blue-600 text-sm sm:text-lg">{team.wins}</div>
                               <div className="text-xs text-blue-500 font-bold">WINS</div>
                             </div>
-                            <div className="text-center bg-orange-50 rounded-lg p-1.5 sm:p-2">
+                            <div className="text-center bg-orange-50 rounded-lg p-1.5 sm:p-2 border border-orange-200">
                               <div className="font-black text-orange-600 text-sm sm:text-lg">{team.obo}</div>
                               <div className="text-xs text-orange-500 font-bold">OBO</div>
                             </div>
-                            <div className="text-center bg-purple-50 rounded-lg p-1.5 sm:p-2">
+                            <div className="text-center bg-purple-50 rounded-lg p-1.5 sm:p-2 border border-purple-200">
                               <div className="font-black text-purple-600 text-sm sm:text-lg">{team.dbo}</div>
                               <div className="text-xs text-purple-500 font-bold">DBO</div>
                             </div>
-                            <div className="text-center bg-red-50 rounded-lg p-1.5 sm:p-2">
+                            <div className="text-center bg-red-50 rounded-lg p-1.5 sm:p-2 border border-red-200">
                               <div className="font-black text-red-600 text-sm sm:text-lg">{team.eoy}</div>
                               <div className="text-xs text-red-500 font-bold">EOY</div>
                             </div>
@@ -870,11 +876,26 @@ useEffect(() => {
 
         {leaderboard.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-8xl mb-6">🏈</div>
-            <h2 className="text-4xl font-black text-gray-700 mb-4">No Data Yet!</h2>
-            <p className="text-xl text-gray-600">Add some awards to see the leaderboard.</p>
+            <div className="text-8xl mb-6">🌴</div>
+            <h2 className="text-4xl font-black text-yellow-300 mb-4">No Data Yet, Mon!</h2>
+            <p className="text-xl text-yellow-200">De party be startin' soon! 🥥</p>
           </div>
         )}
+      </div>
+
+      {/* Footer tribute */}
+      <div className="bg-gradient-to-r from-black via-gray-900 to-black py-6 border-t-4 border-yellow-500 relative z-10">
+        <div className="container mx-auto px-4 text-center">
+          <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-green-400 via-yellow-400 to-red-400 mb-2">
+            🌴 Special Rasta Edition 🌴
+          </div>
+          <div className="text-yellow-300 font-bold">
+            In honor of Caribbean Captain Max's historic moment Jefe!
+          </div>
+          <div className="text-yellow-400 text-sm mt-2">
+            🍹 One rum & coke for every touchdown! ⚓
+          </div>
+        </div>
       </div>
     </div>
   )
