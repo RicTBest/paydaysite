@@ -913,7 +913,7 @@ export default function Home() {
             🌴 Special Rasta Edition 🌴
           </div>
           <div className="text-yellow-300 font-bold">
-            In honor of Caribbean Captain Max's historic first time as Jefe!
+            In honor of Caribbean Captain Max's moment as Jefe!
           </div>
           <div className="text-yellow-400 text-sm mt-2">
             🍹 One rum & coke for every touchdown! ⚓
