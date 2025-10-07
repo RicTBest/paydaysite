@@ -16,13 +16,36 @@ export default function Home() {
   const [userSelectedWeek, setUserSelectedWeek] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [showRumToast, setShowRumToast] = useState(false)
+  const [audioPlaying, setAudioPlaying] = useState(false)
 
   useEffect(() => {
     loadCurrentWeek()
     // Show rum toast on load
     setShowRumToast(true)
     setTimeout(() => setShowRumToast(false), 5000)
+    
+    // Play J Boog when page loads
+    playJBoog()
   }, [])
+
+  const playJBoog = () => {
+    // Create audio element for J Boog - Nice to Know Ya
+    const audio = new Audio('https://cs1.mp3.pm/download/44537159/VkRXMEw2d1dZQmprZW1yUUlBWHROUUhjWHQyYmN1ektycVNSUnNrN1p1Y2R4SzVtZ2V1MnZ3MzJldnQ0Q0pXcVJMeFE3QWxZYVIzT0J0bEZ5OHhPdFBBenZmb29OVmtrdWJ0MVRzd1p3UVYvZjFnUWlJNW1BTGNEeWlidkNGQXI/J_Boog_-_Let_s_do_it_again_(mp3.pm).mp3')
+    audio.volume = 0.4
+    audio.loop = false
+    
+    // Try to play - browsers require user interaction, so this might not work on first load
+    audio.play().catch(err => {
+      console.log('Audio autoplay blocked - user interaction needed')
+      // Add click listener to play on first interaction
+      const playOnClick = () => {
+        audio.play()
+        setAudioPlaying(true)
+        document.removeEventListener('click', playOnClick)
+      }
+      document.addEventListener('click', playOnClick)
+    })
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -890,7 +913,7 @@ export default function Home() {
             🌴 Special Rasta Edition 🌴
           </div>
           <div className="text-yellow-300 font-bold">
-            In honor of Caribbean Captain Max's historic moment Jefe!
+            In honor of Caribbean Captain Max's historic first time as Jefe!
           </div>
           <div className="text-yellow-400 text-sm mt-2">
             🍹 One rum & coke for every touchdown! ⚓
