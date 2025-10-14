@@ -55,16 +55,20 @@ export default function Omelas() {
           .select('owner_id, floor_assignment')
           .eq('season', currentSeason)
 
-        if (!error && overridesData) {
+        if (error) {
+          console.error('Omelas overrides error:', error)
+        } else if (overridesData) {
+          console.log('Loaded overrides:', overridesData)
           overridesData.forEach(override => {
             omelaOverrides[override.owner_id] = override.floor_assignment
           })
         }
       } catch (err) {
-        console.warn('Omelas overrides table error:', err)
+        console.error('Omelas overrides table error:', err)
       }
       
       setOverrides(omelaOverrides)
+      console.log('Final overrides state:', omelaOverrides)
       
       // Load teams and owners (main league tables)
       const { data: teams } = await supabase
@@ -227,9 +231,12 @@ export default function Omelas() {
   const getFloorAssignment = (owner) => {
     // Check for database override first
     if (overrides[owner.id]) {
+      console.log(`Override found for ${owner.name}: ${overrides[owner.id]}`)
       return overrides[owner.id]
     }
-    return floorAssignments[owner.id] || 'first-floor'
+    const autoAssignment = floorAssignments[owner.id] || 'first-floor'
+    console.log(`Auto assignment for ${owner.name}: ${autoAssignment}`)
+    return autoAssignment
   }
 
   // Get color based on performance
@@ -310,7 +317,7 @@ export default function Omelas() {
               <div className="absolute top-3 left-1/2 text-lg">💰</div>
               
               {/* Hot tub on the left side - requested by el jefe */}
-              <div className="absolute left-8 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
+              <div className="absolute bottom-2 flex flex-col items-center" style={{left: '15%'}}>
                 {/* Steam rising */}
                 <div className="relative mb-1">
                   <div className="absolute -top-3 left-1 w-1 h-4 bg-gradient-to-t from-gray-300 to-transparent opacity-60 animate-pulse" style={{animationDelay: '0s'}}></div>
