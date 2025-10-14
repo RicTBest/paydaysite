@@ -5,6 +5,7 @@ export default function Omelas() {
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
+  const [overrides, setOverrides] = useState({})
 
   // Owner initials mapping
   const ownerInitials = {
@@ -45,6 +46,25 @@ export default function Omelas() {
       } catch (err) {
         console.warn('Awards table error:', err)
       }
+      
+      // Load omelas overrides
+      let omelaOverrides = {}
+      try {
+        const { data: overridesData, error } = await supabase
+          .from('omelas_overrides')
+          .select('owner_id, floor_assignment')
+          .eq('season', currentSeason)
+
+        if (!error && overridesData) {
+          overridesData.forEach(override => {
+            omelaOverrides[override.owner_id] = override.floor_assignment
+          })
+        }
+      } catch (err) {
+        console.warn('Omelas overrides table error:', err)
+      }
+      
+      setOverrides(omelaOverrides)
       
       // Load teams and owners (main league tables)
       const { data: teams } = await supabase
@@ -204,7 +224,13 @@ export default function Omelas() {
   }
   
   const floorAssignments = getFloorAssignments(leaderboard)
-  const getFloorAssignment = (owner) => floorAssignments[owner.id] || 'first-floor'
+  const getFloorAssignment = (owner) => {
+    // Check for database override first
+    if (overrides[owner.id]) {
+      return overrides[owner.id]
+    }
+    return floorAssignments[owner.id] || 'first-floor'
+  }
 
   // Get color based on performance
   const getOwnerColor = (rank, totalPlayers) => {
@@ -282,6 +308,44 @@ export default function Omelas() {
               <div className="absolute top-1 left-20 text-lg">✨</div>
               <div className="absolute bottom-4 right-16 text-lg">💎</div>
               <div className="absolute top-3 left-1/2 text-lg">💰</div>
+              
+              {/* Hot tub on the left side - requested by el jefe */}
+              <div className="absolute left-8 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
+                {/* Steam rising */}
+                <div className="relative mb-1">
+                  <div className="absolute -top-3 left-1 w-1 h-4 bg-gradient-to-t from-gray-300 to-transparent opacity-60 animate-pulse" style={{animationDelay: '0s'}}></div>
+                  <div className="absolute -top-4 left-3 w-1 h-5 bg-gradient-to-t from-gray-300 to-transparent opacity-50 animate-pulse" style={{animationDelay: '0.3s'}}></div>
+                  <div className="absolute -top-3 left-5 w-1 h-4 bg-gradient-to-t from-gray-300 to-transparent opacity-55 animate-pulse" style={{animationDelay: '0.6s'}}></div>
+                </div>
+                
+                {/* Hot tub structure */}
+                <div className="relative">
+                  {/* Water with bubbles */}
+                  <div className="w-16 h-8 bg-gradient-to-b from-blue-300 to-blue-400 rounded-t-lg relative overflow-hidden">
+                    {/* Bubbles */}
+                    <div className="absolute bottom-0 left-2 w-1 h-1 bg-white rounded-full opacity-80 animate-ping"></div>
+                    <div className="absolute bottom-1 left-6 w-1 h-1 bg-white rounded-full opacity-70 animate-ping" style={{animationDelay: '0.2s'}}></div>
+                    <div className="absolute bottom-0 left-10 w-1 h-1 bg-white rounded-full opacity-75 animate-ping" style={{animationDelay: '0.4s'}}></div>
+                    <div className="absolute bottom-2 left-4 w-0.5 h-0.5 bg-white rounded-full opacity-60 animate-ping" style={{animationDelay: '0.1s'}}></div>
+                    <div className="absolute bottom-1 left-8 w-0.5 h-0.5 bg-white rounded-full opacity-65 animate-ping" style={{animationDelay: '0.3s'}}></div>
+                  </div>
+                  
+                  {/* Wood panel rim */}
+                  <div className="w-16 h-2 bg-gradient-to-r from-amber-800 via-amber-700 to-amber-800 rounded-lg border-t-2 border-amber-900"></div>
+                  
+                  {/* Wood panels on sides */}
+                  <div className="absolute left-0 top-2 w-full h-6 flex gap-0.5">
+                    <div className="flex-1 bg-gradient-to-b from-amber-700 to-amber-800 border-r border-amber-900"></div>
+                    <div className="flex-1 bg-gradient-to-b from-amber-700 to-amber-800 border-r border-amber-900"></div>
+                    <div className="flex-1 bg-gradient-to-b from-amber-700 to-amber-800 border-r border-amber-900"></div>
+                    <div className="flex-1 bg-gradient-to-b from-amber-700 to-amber-800 border-r border-amber-900"></div>
+                    <div className="flex-1 bg-gradient-to-b from-amber-700 to-amber-800"></div>
+                  </div>
+                  
+                  {/* Bottom edge */}
+                  <div className="absolute left-0 top-8 w-full h-1 bg-amber-900 rounded-b-lg"></div>
+                </div>
+              </div>
               
               {/* Place top floor dweller */}
               <div className="flex flex-wrap gap-4 items-center justify-center z-20 relative">
