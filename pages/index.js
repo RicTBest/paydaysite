@@ -664,7 +664,7 @@ export default function Home() {
             const isLeader = rank === 1
             const isTop3 = rank <= 3
             const isMax = owner.name?.toLowerCase().includes('max')
-            const isWill = owner.name?.toLowerCase().includes('will') && currentWeek >= 8 && isLeader
+            const isWill = owner.name?.toLowerCase().includes('will')
             const displayName = isWill ? 'Fat Boi with No Crown' : owner.name
 
             
