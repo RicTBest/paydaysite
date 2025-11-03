@@ -30,7 +30,7 @@ export default function Home() {
 
   const playJBoog = () => {
     // Create audio element for J Boog - Nice to Know Ya
-    const audio = new Audio('./do-it-again.mp3')
+    const audio = new Audio('/do-it-again.mp3')
     audio.volume = 0.4
     audio.loop = false
     
