@@ -30,7 +30,7 @@ export default function Home() {
 
   const playJBoog = () => {
     // Create audio element for J Boog - Nice to Know Ya
-    const audio = new Audio('https://cs1.mp3.pm/download/44537159/VkRXMEw2d1dZQmprZW1yUUlBWHROUUhjWHQyYmN1ektycVNSUnNrN1p1Y2R4SzVtZ2V1MnZ3MzJldnQ0Q0pXcVJMeFE3QWxZYVIzT0J0bEZ5OHhPdFBBenZmb29OVmtrdWJ0MVRzd1p3UVYvZjFnUWlJNW1BTGNEeWlidkNGQXI/J_Boog_-_Let_s_do_it_again_(mp3.pm).mp3')
+    const audio = new Audio('./do-it-again.mp3')
     audio.volume = 0.4
     audio.loop = false
     
@@ -665,11 +665,11 @@ export default function Home() {
             const isTop3 = rank <= 3
             const isMax = owner.name?.toLowerCase().includes('max')
             const isWill = owner.name?.toLowerCase().includes('will')
-            const displayName = isWill ? 'Fat Boi with No Crown' : owner.name
+            const displayName = owner.name
 
             
             const getRankEmoji = (rank) => {
-              if (rank === 1) return isMax ? '🏴‍☠️👑⚓' : (isWill ? '' : '👑')
+              if (rank === 1) return isMax ? '🏴‍☠️👑⚓' : '👑'
               if (rank === 2) return '🥈'
               if (rank === 3) return '🥉'
               return ''
