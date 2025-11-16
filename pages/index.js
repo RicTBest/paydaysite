@@ -666,6 +666,7 @@ useEffect(() => {
             const goose = gooseData[owner.id] || {}
             const hasGooseRisk = goose.gooseProbability > 0.15
             const rank = owner.rank
+            const name = owner.name
             const numGooses = owner.num_gooses ?? 0
             const gooseEggs = '🥚'.repeat(Math.max(0, numGooses))
             const isLeader = rank === 1
@@ -678,13 +679,13 @@ useEffect(() => {
               return ''
             }
 
-            const getTrophyEmoji = (owner.name) => {
-              if (owner.name === 'Joel') return '🏆🏆🏆'
-              if (owner.name === 'Ric') return '🏆🏆🏆'
-              if (owner.name === 'Will') return '🏆🏆🏆'
-              if (owner.name === 'Joey') return '🏆🏆'
-              if (owner.name === 'Max') return '🏆'
-              if (owner.name === 'Zack') return ''
+            const getTrophyEmoji = (name) => {
+              if (name === 'Joel') return '🏆🏆🏆'
+              if (name === 'Ric') return '🏆🏆🏆'
+              if (name === 'Will') return '🏆🏆🏆'
+              if (name === 'Joey') return '🏆🏆'
+              if (name === 'Max') return '🏆'
+              if (name === 'Zack') return ''
               return ''
             }
             
@@ -720,7 +721,7 @@ useEffect(() => {
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
-                          <span>getTrophyEmoji(owner.name)</span>
+                          <span>getTrophyEmoji(name)</span>
                           {gooseEggs && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{gooseEggs}</span>}
                           {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
