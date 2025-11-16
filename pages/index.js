@@ -677,6 +677,16 @@ useEffect(() => {
               if (rank === 3) return '🥉'
               return ''
             }
+
+            const getTrophyEmoji = (owner.name) => {
+              if (owner.name === 'Joel') return '🏆🏆🏆'
+              if (owner.name === 'Ric') return '🏆🏆🏆'
+              if (owner.name === 'Will') return '🏆🏆🏆'
+              if (owner.name === 'Joey') return '🏆🏆'
+              if (owner.name === 'Max') return '🏆'
+              if (owner.name === 'Zack') return ''
+              return ''
+            }
             
             return (
               <div 
@@ -710,6 +720,7 @@ useEffect(() => {
                       <div>
                         <h2 className="text-2xl sm:text-3xl font-black text-gray-800 flex items-center space-x-2 sm:space-x-3 mb-1">
                           <span>{owner.name}</span>
+                          <span>getTrophyEmoji(owner.name)</span>
                           {gooseEggs && <span className={`text-3xl sm:text-4xl ${numGooses > 0 ? 'animate-bounce' : ''}`}>{gooseEggs}</span>}
                           {getRankEmoji(rank) && <span className={`text-3xl sm:text-4xl ${rank === 1 ? 'animate-bounce' : ''}`}>{getRankEmoji(rank)}</span>}
                         </h2>
