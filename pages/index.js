@@ -11,7 +11,7 @@ const [currentFiscalYear, setCurrentFiscalYear] = useState(2025)
 const [currentWeek, setCurrentWeek] = useState(3)
 const [actualWeek, setActualWeek] = useState(3)
 const [lastUpdate, setLastUpdate] = useState(null)
-const [autoSync Data, setAutoSync Data] = useState(true)
+const [autoSyncData, setAutoSyncData] = useState(true)
 const [weekInfo, setWeekInfo] = useState(null)
 const [userSelectedWeek, setUserSelectedWeek] = useState(false) // Track if user manually selected
 const [isInitialLoad, setIsInitialLoad] = useState(true)
@@ -24,7 +24,7 @@ loadCurrentWeek()
 useEffect(() => {
 // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
 const interval = setInterval(() => {
-if (autoSync Data && !userSelectedWeek) {
+if (autoSyncData && !userSelectedWeek) {
 console.log('Auto-refreshing data…')
 loadCurrentWeek() // Changed from loadData() to loadCurrentWeek()
 }
@@ -35,7 +35,7 @@ const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCas
 return () => {
 clearInterval(interval)
 }
-}, [autoSync Data, userSelectedWeek])
+}, [autoSyncData, userSelectedWeek])
 
 // Function to change week manually - this is the key fix
 function changeWeek(newWeek) {
@@ -584,7 +584,7 @@ return (
 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-6 lg:space-y-0">
 <div>
 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-700 mb-3 tracking-tight">
-🏈 FOUNDERS (+ Business Associate Will Feldman, Esq.) LEAGUE
+🏈 FOUNDERS (+ Paralegal M. Nickbarg) LEAGUE
 </h1>
 <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-gray-600">
 <span className="font-bold text-lg bg-stone-200 px-3 py-1 rounded-full w-fit">
@@ -596,9 +596,9 @@ Week {currentWeek} • {currentFiscalYear} Fiscal Year
 </span>
 )}
 <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow w-fit">
-<div className={`w-3 h-3 rounded-full animate-pulse ${autoSync Data && !userSelectedWeek ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+<div className={`w-3 h-3 rounded-full animate-pulse ${autoSyncData && !userSelectedWeek ? 'bg-green-500' : 'bg-gray-400'}`}></div>
 <span className="text-sm font-medium">
-Live updates {autoSync Data && !userSelectedWeek ? 'ON' : 'OFF'}
+Live updates {autoSyncData && !userSelectedWeek ? 'ON' : 'OFF'}
 {userSelectedWeek && ' (manual)'}
 </span>
 </div>
@@ -664,14 +664,14 @@ Live updates {autoSync Data && !userSelectedWeek ? 'ON' : 'OFF'}
             </a>
             
             <button 
-              onClick={() => setAutoSync Data(!autoSync Data)}
+              onClick={() => setAutoSyncData(!autoSyncData)}
               className={`px-4 sm:px-6 py-3 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg text-sm sm:text-base ${
-                autoSync Data 
+                autoSyncData 
                   ? 'bg-gradient-to-r from-gray-500 to-gray-600 text-white hover:from-emerald-600 hover:to-green-700' 
                   : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white hover:from-gray-500 hover:to-gray-600'
               }`}
             >
-              🔄 Auto-refresh {autoSync Data ? 'ON' : 'OFF'}
+              🔄 Auto-refresh {autoSync lData ? 'ON' : 'OFF'}
             </button>
             
             <button 
