@@ -7,7 +7,7 @@ const [probabilities, setProbabilities] = useState({})
 const [gooseData, setGooseData] = useState({})
 const [games, setGames] = useState({})
 const [loading, setLoading] = useState(true)
-const [currentFiscal Year, setCurrentFiscal Year] = useState(2025)
+const [currentFiscalYear, setCurrentFiscalYear] = useState(2025)
 const [currentWeek, setCurrentWeek] = useState(3)
 const [actualWeek, setActualWeek] = useState(3)
 const [lastUpdate, setLastUpdate] = useState(null)
@@ -105,7 +105,7 @@ try {
 const { data: awardsData, error } = await supabase
 .from('awards')
 .select('*')
-.eq('season', currentFiscal Year)
+.eq('season', currentFiscalYear)
 
 ```
   if (error) {
@@ -330,7 +330,7 @@ try {
 const { data: gamesData, error: gamesError } = await supabase
 .from('games')
 .select('*')
-.eq('season', currentFiscal Year)
+.eq('season', currentFiscalYear)
 .eq('week', weekNumber)
 
 ```
@@ -423,7 +423,7 @@ const { data: gamesData, error: gamesError } = await supabase
 async function loadProbabilitiesForWeek(teams, weekNumber) {
 try {
 console.log(`Loading probabilities for Week ${weekNumber}`)
-const response = await fetch(`/api/kalshi-probabilities?week=${weekNumber}&season=${currentFiscal Year}`)
+const response = await fetch(`/api/kalshi-probabilities?week=${weekNumber}&season=${currentFiscalYear}`)
 if (response.ok) {
 const data = await response.json()
 
@@ -464,7 +464,7 @@ try {
       body: JSON.stringify({
         owner_id: owner.id,
         week: weekNumber, // Use the specific week number
-        season: currentFiscal Year
+        season: currentFiscalYear
         // Don't pass probabilities - let the API fetch them fresh for this week
       })
     })
@@ -510,7 +510,7 @@ fetch('/api/current-week?display=true')
     console.log('Actual week:', actualData)
     console.log('Display week:', displayData)
     
-    setCurrentFiscal Year(actualData.season)
+    setCurrentFiscalYear(actualData.season)
     setActualWeek(actualData.week)
     
     // Only use smart default on initial load, not if user has made a selection
@@ -588,7 +588,7 @@ return (
 </h1>
 <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-gray-600">
 <span className="font-bold text-lg bg-stone-200 px-3 py-1 rounded-full w-fit">
-Week {currentWeek} • {currentFiscal Year} Fiscal Year
+Week {currentWeek} • {currentFiscalYear} Fiscal Year
 </span>
 {lastUpdate && (
 <span className="text-sm bg-white px-2 py-1 rounded-full shadow w-fit">
