@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from ‘../lib/supabase’
+import { supabase } from '../lib/supabase'
 
 export default function Home() {
 const [leaderboard, setLeaderboard] = useState([])
@@ -22,15 +22,15 @@ loadCurrentWeek()
 }, [])
 
 useEffect(() => {
-// Only auto-refresh if user hasn’t manually selected a week, or if enough time has passed
+// Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
 const interval = setInterval(() => {
 if (autoSync Data && !userSelectedWeek) {
-console.log(‘Auto-refreshing data…’)
+console.log('Auto-refreshing data…')
 loadCurrentWeek() // Changed from loadData() to loadCurrentWeek()
 }
 }, 1 * 60 * 1000)
 
-const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes(‘will’)
+const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes('will')
 
 return () => {
 clearInterval(interval)
@@ -103,9 +103,9 @@ async function loadBaseData() {
 let awards = []
 try {
 const { data: awardsData, error } = await supabase
-.from(‘awards’)
-.select(’*’)
-.eq(‘season’, currentFiscal Year)
+.from('awards')
+.select('*')
+.eq('season', currentFiscal Year)
 
 ```
   if (error) {
@@ -328,10 +328,10 @@ async function loadGamesForWeek(weekNumber) {
 console.log(`Loading games for Week ${weekNumber}`)
 try {
 const { data: gamesData, error: gamesError } = await supabase
-.from(‘games’)
-.select(’*’)
-.eq(‘season’, currentFiscal Year)
-.eq(‘week’, weekNumber)
+.from('games')
+.select('*')
+.eq('season', currentFiscal Year)
+.eq('week', weekNumber)
 
 ```
   if (!gamesError && gamesData && gamesData.length > 0) {
@@ -495,11 +495,11 @@ try {
 }
 
 async function loadCurrentWeek() {
-console.log(‘Loading current week…’)
+console.log('Loading current week…')
 try {
 const [actualResponse, displayResponse] = await Promise.all([
-fetch(’/api/current-week’),
-fetch(’/api/current-week?display=true’)
+fetch('/api/current-week'),
+fetch('/api/current-week?display=true')
 ])
 
 ```
@@ -539,12 +539,12 @@ fetch(’/api/current-week?display=true’)
 }
 
 function getDayOfWeekName(dayOfWeek) {
-const days = [‘Sunday’, ‘Monday’, ‘Tuesday’, ‘Wednesday’, ‘Thursday’, ‘Friday’, ‘Saturday’]
-return days[dayOfWeek] || ‘Unknown’
+const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+return days[dayOfWeek] || 'Unknown'
 }
 
 function getWeekDisplayLogic() {
-if (!weekInfo) return ‘’
+if (!weekInfo) return ''
 
 ```
 const dayName = getDayOfWeekName(weekInfo.dayOfWeek)
@@ -562,7 +562,7 @@ return `${dayName}: Showing current NFL Week ${weekInfo.display}`
 }
 
 if (loading && leaderboard.length === 0) {
-const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes(‘will’)
+const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes('will')
 
 return (
 <div className="min-h-screen bg-gradient-to-br from-gray-100 via-gray-200 to-stone-200 flex justify-center items-center">
@@ -574,7 +574,7 @@ return (
 )
 }
 
-const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes(‘will’)
+const isWillInFirst = leaderboard.length > 0 && leaderboard[0]?.name?.toLowerCase().includes('will')
 
 return (
 <div className="min-h-screen bg-gradient-to-br from-gray-50 via-stone-100 to-gray-200">
@@ -598,8 +598,8 @@ Week {currentWeek} • {currentFiscal Year} Fiscal Year
 <div className="flex items-center space-x-2 bg-white px-3 py-1 rounded-full shadow w-fit">
 <div className={`w-3 h-3 rounded-full animate-pulse ${autoSync Data && !userSelectedWeek ? 'bg-green-500' : 'bg-gray-400'}`}></div>
 <span className="text-sm font-medium">
-Live updates {autoSync Data && !userSelectedWeek ? ‘ON’ : ‘OFF’}
-{userSelectedWeek && ’ (manual)’}
+Live updates {autoSync Data && !userSelectedWeek ? 'ON' : 'OFF'}
+{userSelectedWeek && ' (manual)'}
 </span>
 </div>
 </div>
@@ -898,6 +898,5 @@ ${team.earnings}
   </div>
 </div>
 ```
-
 )
 }
