@@ -871,7 +871,6 @@ export default function Home() {
                                 />
                                 <div>
                                   <div className="font-bold text-gray-800">{team.abbr}</div>
-                                  <div className="text-xs text-gray-500">{team.name}</div>
                                 </div>
                               </div>
                             </td>
