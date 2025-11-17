@@ -503,18 +503,28 @@ export default function Home() {
   if (loading && leaderboard.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100 flex justify-center items-center">
-        <div className="text-center bg-white p-12 border border-gray-400 max-w-2xl mx-4">
-          <div className="text-3xl font-bold text-gray-700 mb-4">
-            AGGREGATING PERFORMANCE METRICS
-          </div>
-          <div className="text-lg text-gray-600 mb-2">
-            Compiling cross-functional KPI data streams...
-          </div>
-          <div className="text-sm text-gray-500">
-            Leveraging enterprise-grade analytics infrastructure to optimize stakeholder visibility
-          </div>
-          <div className="mt-6 text-xs text-gray-400 border-t border-gray-300 pt-4">
-            Feldman & Associates LLC - Professional Services Division
+        <div 
+          className="text-center bg-white p-12 border border-gray-400 max-w-3xl mx-4 relative"
+          style={{
+            backgroundImage: 'url(https://images.unsplash.com/photo-1483653085484-eb63c9f02547?q=80&w=1740)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        >
+          <div className="absolute inset-0 bg-white/90"></div>
+          <div className="relative z-10">
+            <div className="text-3xl font-bold text-gray-700 mb-4">
+              PREPARING FELDMAN PARTY MATERIALS
+            </div>
+            <div className="text-lg text-gray-600 mb-2">
+              Assembling approved networking event documentation...
+            </div>
+            <div className="text-sm text-gray-500">
+              At Feldman & Associates, we strive to deliver measurable value through synergistic collaboration frameworks and best-in-class stakeholder engagement methodologies.
+            </div>
+            <div className="mt-6 text-xs text-gray-400 border-t border-gray-300 pt-4">
+              Feldman & Associates LLC - Where Excellence Meets Professionalism
+            </div>
           </div>
         </div>
       </div>
@@ -523,83 +533,148 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <div className="bg-white border-b-2 border-gray-400">
-        <div className="container mx-auto px-4 py-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              FELDMAN & ASSOCIATES - WORK APPROVED SOCIAL FUNCTION (a.k.a. "Feldman Party")
-            </h1>
-            <div className="text-sm text-gray-600">
-              Quarterly Review Period: Week {currentWeek} | Fiscal Year {currentSeason}
+      {/* Corporate Hero Section */}
+      <div 
+        className="relative border-b-2 border-gray-400"
+        style={{
+          backgroundImage: 'url(https://plus.unsplash.com/premium_photo-1682056762907-23d08f913805?q=80&w=1548)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-white/85"></div>
+        <div className="relative z-10 container mx-auto px-4 py-12">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="mb-6">
+              <img 
+                src="https://plus.unsplash.com/premium_photo-1661347859297-859b8ae1d7c5?q=80&w=1498"
+                alt="Professional consultation"
+                className="w-32 h-32 mx-auto rounded-full border-4 border-gray-400 object-cover"
+              />
             </div>
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">
+              THE FELDMAN PARTY
+            </h1>
+            <div className="text-xl text-gray-600 mb-6">
+              A Compliant, Work-Approved Social Networking Function
+            </div>
+            <div className="bg-white border border-gray-400 p-6 text-left">
+              <p className="text-sm text-gray-700 leading-relaxed mb-4">
+                Here at Feldman & Associates, we strive to cultivate an environment of professional excellence through strategic relationship-building initiatives. The Feldman Party represents our commitment to fostering collaborative synergies while maintaining the highest standards of corporate decorum.
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                This quarterly team-building exercise leverages cross-functional performance metrics to drive stakeholder engagement and promote best practices in interpersonal professional development. All activities are conducted in full compliance with HR guidelines and applicable corporate policies.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mission Statement Banner */}
+      <div 
+        className="relative border-b border-gray-300"
+        style={{
+          backgroundImage: 'url(https://images.unsplash.com/photo-1496588152823-86ff7695e68f?q=80&w=1740)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-gray-100/90"></div>
+        <div className="relative z-10 py-6">
+          <div className="container mx-auto px-4 text-center">
+            <div className="text-xs text-gray-600 uppercase tracking-wide mb-2">Our Corporate Mission</div>
+            <div className="text-sm text-gray-700 max-w-3xl mx-auto">
+              "To maximize synergistic value propositions through data-driven decision frameworks while maintaining operational excellence and fostering sustainable growth trajectories in alignment with core competency development objectives."
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Bar */}
+      <div className="bg-white border-b-2 border-gray-400">
+        <div className="container mx-auto px-4 py-4">
+          <div className="mb-4">
+            <div className="text-xs text-gray-500 uppercase mb-1">Approved Corporate Social Function</div>
+            <h2 className="text-xl font-bold text-gray-800">
+              Feldman Party - Performance Review Period {currentWeek} | FY {currentSeason}
+            </h2>
             {lastUpdate && (
               <div className="text-xs text-gray-500 mt-1">
-                Data last synchronized: {lastUpdate.toLocaleTimeString()} | Auto-refresh status: {autoRefresh && !userSelectedWeek ? 'ENABLED' : 'DISABLED'}
+                Data synchronized: {lastUpdate.toLocaleTimeString()} | Refresh protocol: {autoRefresh && !userSelectedWeek ? 'ACTIVE' : 'SUSPENDED'}
               </div>
             )}
           </div>
           
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap text-sm">
             <button
               onClick={() => changeWeek(currentWeek - 1)}
               disabled={currentWeek <= 1}
-              className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:text-gray-400 text-gray-700 px-3 py-1 text-sm border border-gray-400"
+              className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 px-3 py-1 border border-gray-400"
             >
-              Previous Period
+              Previous
             </button>
             <select
               value={currentWeek}
               onChange={(e) => changeWeek(parseInt(e.target.value))}
-              className="bg-gray-200 text-gray-700 px-3 py-1 text-sm border border-gray-400"
+              className="bg-gray-200 text-gray-700 px-3 py-1 border border-gray-400"
             >
               {Array.from({ length: 18 }, (_, i) => i + 1).map(w => (
-                <option key={w} value={w}>Review Period {w}</option>
+                <option key={w} value={w}>Period {w}</option>
               ))}
             </select>
             <button
               onClick={() => changeWeek(currentWeek + 1)}
               disabled={currentWeek >= 18}
-              className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 disabled:text-gray-400 text-gray-700 px-3 py-1 text-sm border border-gray-400"
+              className="bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 px-3 py-1 border border-gray-400"
             >
-              Next Period
+              Next
             </button>
             <button 
               onClick={loadData}
               disabled={loading}
-              className="bg-gray-400 hover:bg-gray-500 disabled:bg-gray-300 text-white px-4 py-1 text-sm border border-gray-500"
+              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 border border-gray-500"
             >
-              Refresh Data
+              Refresh
             </button>
-            <a
-              href="/scoreboard"
-              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 text-sm border border-gray-500"
-            >
-              Detailed Scoreboard
-            </a>
-            <a
-              href="/minimal"
-              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 text-sm border border-gray-500"
-            >
-              Executive Summary
-            </a>
-            <a
-              href="/admin"
-              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 text-sm border border-gray-500"
-            >
-              Administration Portal
-            </a>
+            <a href="/scoreboard" className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 border border-gray-500">Scoreboard</a>
+            <a href="/minimal" className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 border border-gray-500">Summary</a>
+            <a href="/admin" className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1 border border-gray-500">Admin</a>
           </div>
         </div>
       </div>
 
+      {/* Attendee Recognition Section */}
       <div className="container mx-auto px-4 py-6">
+        <div className="mb-6 bg-white border border-gray-300 p-4">
+          <div 
+            className="relative h-24 mb-4"
+            style={{
+              backgroundImage: 'url(https://images.unsplash.com/photo-1709715357520-5e1047a2b691?q=80&w=1742)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-lg font-bold text-gray-800">FELDMAN PARTY ATTENDEE ROSTER</div>
+                <div className="text-xs text-gray-600">Current Networking Session Participants</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-600 leading-relaxed">
+            The following professionals have been authorized to participate in this quarter's team-building exercise. 
+            Performance metrics displayed below reflect cumulative contributions to organizational objectives and are 
+            provided for informational purposes only, in accordance with our transparency and professional development guidelines.
+          </div>
+        </div>
+
         <div className="space-y-4">
           {leaderboard.map((owner, index) => {
             const goose = gooseData[owner.id] || {}
             const hasGooseRisk = goose.gooseProbability > 0.15
             const rank = owner.rank
             const numGooses = owner.num_gooses ?? 0
-            const isLeader = rank === 1
             const isWill = owner.name?.toLowerCase().includes('will')
             
             return (
@@ -607,59 +682,72 @@ export default function Home() {
                 key={owner.id} 
                 className="bg-white border border-gray-300"
               >
-                <div className="p-4 bg-gray-50 border-b border-gray-300">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-xs text-gray-500 uppercase mb-1">Portfolio Manager / Strategic Consultant</div>
-                      <h2 className="text-lg font-bold text-gray-800">{owner.name}{isWill && ', Esq., MBA'}</h2>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Performance Ranking: <span className="font-bold">#{rank}</span> | 
-                        Cumulative Portfolio Value: <span className="font-bold">${owner.totalEarnings}</span>
-                        {numGooses > 0 && <span> | Historical Risk Events: {numGooses}</span>}
+                {/* Header with stock photo */}
+                <div 
+                  className="relative h-32 border-b border-gray-300"
+                  style={{
+                    backgroundImage: 'url(https://images.unsplash.com/photo-1686771416282-3888ddaf249b?q=80&w=1742)',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  <div className="absolute inset-0 bg-white/80"></div>
+                  <div className="relative z-10 p-4 flex items-center justify-between h-full">
+                    <div className="flex items-center gap-4">
+                      <div className="w-20 h-20 bg-gray-200 border-2 border-gray-400 flex items-center justify-center">
+                        <div className="text-2xl font-bold text-gray-600">#{rank}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-gray-500 uppercase mb-1">
+                          Professional Attendee {isWill && '/ Legal Counsel'}
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-800">
+                          {owner.name}{isWill && ', Esq., MBA'}
+                        </h3>
+                        <div className="text-sm text-gray-600 mt-1">
+                          Cumulative Performance Score: ${owner.totalEarnings}
+                          {numGooses > 0 && <span className="ml-2">| Prior Risk Events: {numGooses}</span>}
+                        </div>
                       </div>
                     </div>
                     
                     <div className="text-right">
-                      <table className="text-xs text-gray-600 border-collapse border border-gray-300">
-                        <tbody>
-                          <tr className="border-b border-gray-300 bg-white">
-                            <td className="py-1 px-2 border-r border-gray-300">Key Performance Indicators:</td>
-                            <td className="py-1 px-2 font-semibold"></td>
-                          </tr>
-                          <tr className="border-b border-gray-300 bg-white">
-                            <td className="py-1 px-2 border-r border-gray-300">Win Events</td>
-                            <td className="py-1 px-2 font-semibold text-right">{owner.wins}</td>
-                          </tr>
-                          <tr className="border-b border-gray-300 bg-white">
-                            <td className="py-1 px-2 border-r border-gray-300">Offensive Benchmarks</td>
-                            <td className="py-1 px-2 font-semibold text-right">{owner.obo}</td>
-                          </tr>
-                          <tr className="border-b border-gray-300 bg-white">
-                            <td className="py-1 px-2 border-r border-gray-300">Defensive Benchmarks</td>
-                            <td className="py-1 px-2 font-semibold text-right">{owner.dbo}</td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="py-1 px-2 border-r border-gray-300">End-of-Year Metrics</td>
-                            <td className="py-1 px-2 font-semibold text-right">{owner.eoy}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                      
-                      <div className={`text-xs mt-2 px-2 py-1 border ${
+                      <div className={`text-xs px-3 py-1 border inline-block ${
                         goose.gooseProbability > 0.1 ? 'bg-red-50 border-red-400 text-red-700' :
                         goose.gooseProbability > 0.05 ? 'bg-yellow-50 border-yellow-400 text-yellow-700' :
                         'bg-gray-50 border-gray-300 text-gray-600'
                       }`}>
-                        Risk Assessment Profile: {goose.goosePercentage || '0%'}
+                        Risk Level: {goose.goosePercentage || '0%'}
                       </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-gray-50 border-b border-gray-300">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white border border-gray-300 p-3">
+                      <div className="text-xs text-gray-500 uppercase mb-1">Win Events</div>
+                      <div className="text-2xl font-bold text-gray-800">{owner.wins}</div>
+                    </div>
+                    <div className="bg-white border border-gray-300 p-3">
+                      <div className="text-xs text-gray-500 uppercase mb-1">Offensive Metrics</div>
+                      <div className="text-2xl font-bold text-gray-800">{owner.obo}</div>
+                    </div>
+                    <div className="bg-white border border-gray-300 p-3">
+                      <div className="text-xs text-gray-500 uppercase mb-1">Defensive Metrics</div>
+                      <div className="text-2xl font-bold text-gray-800">{owner.dbo}</div>
+                    </div>
+                    <div className="bg-white border border-gray-300 p-3">
+                      <div className="text-xs text-gray-500 uppercase mb-1">EOY Achievements</div>
+                      <div className="text-2xl font-bold text-gray-800">{owner.eoy}</div>
                     </div>
                   </div>
                   
                   {hasGooseRisk && (
-                    <div className="mt-3 p-2 bg-white border border-gray-400">
+                    <div className="mt-3 p-3 bg-white border border-gray-400">
                       <div className="text-xs text-gray-700">
-                        <strong>RISK MANAGEMENT ADVISORY:</strong> Current portfolio composition exhibits {goose.goosePercentage} statistical probability of zero-point outcome during this reporting period. 
-                        Contributing factors: {goose.reason}
+                        <strong>ATTENDANCE ADVISORY:</strong> Current portfolio exhibits {goose.goosePercentage} probability of zero-point outcome this period. 
+                        Recommendation: Review asset allocation strategy. Contributing factors: {goose.reason}
                       </div>
                     </div>
                   )}
@@ -667,16 +755,16 @@ export default function Home() {
                 
                 <div className="p-4">
                   <div className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-300">
-                    STRATEGIC ASSET ALLOCATION - DETAILED PERFORMANCE BREAKDOWN
+                    DETAILED PERFORMANCE BREAKDOWN - FELDMAN PARTY EDITION
                   </div>
                   <table className="w-full text-left border-collapse border border-gray-300">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Asset ID</th>
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Matchup Data</th>
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Win Probability</th>
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-right border border-gray-300">Portfolio Value</th>
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">Win</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Asset</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Status</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Win %</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-right border border-gray-300">Value</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">W</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">OBO</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">DBO</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">EOY</th>
@@ -695,7 +783,7 @@ export default function Home() {
                         let enhancedStatusText = ''
                         
                         if (!game) {
-                          opponentText = 'Non-Operational Period (Bye Week)'
+                          opponentText = 'Scheduled Break Period'
                           enhancedStatusText = ''
                         } else {
                           const parts = game.enhancedStatus.split('|')
@@ -704,8 +792,8 @@ export default function Home() {
                         }
                         
                         const gameResultText = !gameIsComplete ? 'In Progress' :
-                          game?.result === 'win' ? 'Win' :
-                          game?.result === 'tie' && !game?.isHome ? 'Win (Tie/Away)' : 'Loss'
+                          game?.result === 'win' ? 'Completed Successfully' :
+                          game?.result === 'tie' && !game?.isHome ? 'Completed Successfully (Away Tie)' : 'Completed Unsuccessfully'
                         
                         return (
                           <tr key={team.abbr} className={teamIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -715,12 +803,10 @@ export default function Home() {
                             </td>
                             <td className="py-2 px-2 text-xs text-gray-600 border border-gray-300">
                               <div>{opponentText}</div>
-                              {enhancedStatusText && (
-                                <div className="text-gray-500">{enhancedStatusText}</div>
-                              )}
+                              {enhancedStatusText && <div className="text-gray-500">{enhancedStatusText}</div>}
                             </td>
                             <td className="py-2 px-2 text-xs text-gray-600 border border-gray-300">
-                              {showLiveProbability ? `${winPercentage}% likelihood` : gameIsComplete ? gameResultText : 'Scheduled'}
+                              {showLiveProbability ? `${winPercentage}%` : gameIsComplete ? gameResultText : 'Scheduled'}
                             </td>
                             <td className="py-2 px-2 text-sm font-bold text-gray-800 text-right border border-gray-300">
                               ${team.earnings}
@@ -741,35 +827,60 @@ export default function Home() {
         </div>
 
         {leaderboard.length === 0 && (
-          <div className="text-center py-16 bg-white border border-gray-300">
-            <h2 className="text-2xl font-bold text-gray-700 mb-2">DATA AGGREGATION IN PROGRESS</h2>
-            <p className="text-gray-600">Awaiting performance metrics input to generate comprehensive stakeholder report.</p>
+          <div 
+            className="text-center py-16 bg-white border border-gray-300 relative"
+            style={{
+              backgroundImage: 'url(https://plus.unsplash.com/premium_photo-1682436594687-922216809102?q=80&w=687)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            <div className="absolute inset-0 bg-white/85"></div>
+            <div className="relative z-10">
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">FELDMAN PARTY ATTENDANCE PENDING</h2>
+              <p className="text-gray-600">Awaiting attendee roster confirmation and performance data compilation.</p>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="mt-8 bg-gray-800 py-8 border-t-2 border-gray-600">
-        <div className="container mx-auto px-4">
-          <div className="text-xs text-gray-400 leading-relaxed space-y-2">
-            <p className="text-center font-semibold text-gray-300 mb-3">
-              Feldman & Associates, LLC - Professional Consulting Services
-            </p>
-            
-            <p>
-              <strong>DISCLAIMER:</strong> The information provided herein is for informational and analytical purposes only. Feldman & Associates, LLC makes no representations or warranties regarding completeness, accuracy, or reliability of data. Past performance does not guarantee future results.
-            </p>
+      {/* Footer */}
+      <div 
+        className="mt-8 relative border-t-2 border-gray-600"
+        style={{
+          backgroundImage: 'url(https://plus.unsplash.com/premium_photo-1661346080169-1839b2af02aa?q=80&w=1738)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-gray-800/95"></div>
+        <div className="relative z-10 py-8">
+          <div className="container mx-auto px-4">
+            <div className="text-xs text-gray-400 leading-relaxed space-y-3 max-w-4xl mx-auto">
+              <p className="text-center font-semibold text-gray-300 mb-4">
+                Feldman & Associates, LLC - Corporate Social Networking Events Division
+              </p>
+              
+              <p>
+                At Feldman & Associates, we believe that strategic networking opportunities drive measurable value through synergistic stakeholder engagement. The Feldman Party represents our ongoing commitment to fostering professional development in a compliant, work-appropriate environment that aligns with our core values of excellence, integrity, and collaborative problem-solving.
+              </p>
 
-            <p>
-              <strong>COMPLIANCE NOTICE:</strong> This platform operates in full compliance with applicable federal and state regulations including SOX, GDPR, CCPA, and SEC filing requirements. All stakeholder communications are subject to attorney-client privilege where applicable.
-            </p>
+              <p>
+                <strong>PROFESSIONAL DEVELOPMENT NOTICE:</strong> All Feldman Party activities are conducted in accordance with applicable corporate policies, HR guidelines, and industry best practices. Attendance is voluntary and subject to manager approval. Light refreshments (half-glass wine maximum) may be provided in accordance with company alcohol policy.
+              </p>
 
-            <p className="text-center pt-3 border-t border-gray-700">
-              123 Corporate Plaza, Suite 4000 | Sonoma Valley, CA 94559 | info@feldmanassociates.legal
-            </p>
+              <p>
+                <strong>DISCLAIMER:</strong> Performance metrics displayed are for informational and team-building purposes only. Past performance does not guarantee future results. All data is subject to verification and may be adjusted pending audit review.
+              </p>
 
-            <p className="text-center text-gray-500">
-              © 2025 Feldman & Associates, LLC. All Rights Reserved. Terms subject to change without notice.
-            </p>
+              <p className="text-center pt-4 border-t border-gray-700">
+                123 Corporate Plaza, Suite 4000 | Sonoma Valley, CA 94559 | feldmanparty@feldmanassociates.legal
+              </p>
+
+              <p className="text-center text-gray-500 text-xs">
+                © 2025 Feldman & Associates, LLC. All Rights Reserved. | "Excellence Through Measured Professionalism"
+              </p>
+            </div>
           </div>
         </div>
       </div>
