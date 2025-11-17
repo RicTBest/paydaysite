@@ -63,34 +63,6 @@ setUserSelectedWeek(true) // Remember that user made a manual selection
 async function loadDataForWeek(weekNumber) {
 console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
 setLoading(true)
-
-```
-try {
-  // Load all the base data first
-  const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
-  setLeaderboard(sortedLeaderboard)
-
-  // Then load week-specific data with the correct week number
-  await Promise.all([
-    loadProbabilitiesForWeek(teams, weekNumber),
-    loadGamesForWeek(weekNumber)
-  ])
-
-  // IMPORTANT: Load goose probabilities AFTER we have the correct probabilities
-  // We need to wait a bit for probabilities state to update
-  setTimeout(async () => {
-    await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
-    setLastUpdate(new Date())
-    setLoading(false)
-    console.log(`=== WEEK ${weekNumber} DATA LOAD COMPLETE ===`)
-  }, 500)
-
-} catch (error) {
-  console.error('Error loading data for week:', error)
-  setLoading(false)
-}
-```
-
 }
 
 // Modified loadData to use the current week in state
