@@ -527,7 +527,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-6">
           <div className="mb-4">
             <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              FELDMAN & ASSOCIATES - FANTASY FOOTBALL PERFORMANCE DASHBOARD
+              FELDMAN & ASSOCIATES - WORK APPROVED SOCIAL FUNCTION (a.k.a. "Feldman Party")
             </h1>
             <div className="text-sm text-gray-600">
               Quarterly Review Period: Week {currentWeek} | Fiscal Year {currentSeason}
