@@ -822,9 +822,9 @@ export default function Home() {
                   <table className="w-full text-left border-collapse border border-gray-300">
                     <thead>
                       <tr className="bg-gray-200">
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Asset ID</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Asset_ID</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Matchup Data</th>
-                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Win Probability</th>
+                        <th className="py-2 px-2 text-xs font-semibold text-gray-700 border border-gray-300">Win %</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-right border border-gray-300">Portfolio Value</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">Win</th>
                         <th className="py-2 px-2 text-xs font-semibold text-gray-700 text-center border border-gray-300">OBO</th>
@@ -870,6 +870,7 @@ export default function Home() {
                                   }}
                                 />
                                 <div>
+                                  <br/>
                                   <div className="font-bold text-gray-800">{team.abbr}</div>
                                 </div>
                               </div>
