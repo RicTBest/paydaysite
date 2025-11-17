@@ -869,10 +869,6 @@ export default function Home() {
                                     e.target.src = `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500/nfl.png`
                                   }}
                                 />
-                                <div>
-                                  <br/>
-                                  <div className="font-bold text-gray-800">{team.abbr}</div>
-                                </div>
                               </div>
                             </td>
                             <td className="py-2 px-2 text-xs text-gray-600 border border-gray-300">
