@@ -878,7 +878,7 @@ export default function Home() {
                               )}
                             </td>
                             <td className="py-2 px-2 text-xs text-gray-600 border border-gray-300">
-                              {showLiveProbability ? `${winPercentage}% likelihood` : gameIsComplete ? gameResultText : 'Scheduled'}
+                              {showLiveProbability ? `${winPercentage}%` : gameIsComplete ? gameResultText : 'Scheduled'}
                             </td>
                             <td className="py-2 px-2 text-sm font-bold text-gray-800 text-right border border-gray-300">
                               ${team.earnings}
