@@ -943,8 +943,8 @@ export default function Home() {
                             </div>
                           </div>
                           
-                          {/* Stats Grid - Now 5 columns when playoffs exist */}
-                          <div className={`grid gap-1 sm:gap-1 ${teamHasPlayoffs ? 'grid-cols-5' : 'grid-cols-4'}`}>
+                          {/* Stats Grid - Always 4 columns */}
+                          <div className="grid grid-cols-4 gap-1 sm:gap-1">
                             <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2">
                               <div className="font-black text-blue-600 text-sm sm:text-lg">{team.wins}</div>
                               <div className="text-xs text-blue-500 font-bold">WINS</div>
@@ -961,34 +961,12 @@ export default function Home() {
                               <div className="font-black text-red-600 text-sm sm:text-lg">${team.eoyDollars || 0}</div>
                               <div className="text-xs text-red-500 font-bold">EOY</div>
                             </div>
-                            {teamHasPlayoffs && (
-                              <div className="text-center bg-yellow-100 rounded-lg p-1.5 sm:p-2">
-                                <div className="font-black text-yellow-700 text-sm sm:text-lg">${team.playoffs}</div>
-                                <div className="text-xs text-yellow-600 font-bold">PLAYOFF</div>
-                              </div>
-                            )}
                           </div>
                           
-                          {/* Team Playoff Progress Bar */}
-                          {team.playoffDetails && team.playoffDetails.length > 0 && (
-                            <div className="mt-2 bg-gradient-to-r from-yellow-100 to-amber-100 rounded-lg px-2 py-1">
-                              <div className="flex flex-wrap gap-1">
-                                {team.playoffDetails.map((detail, i) => {
-                                  const shortLabel = {
-                                    'PLAYOFF_BERTH': '🎫',
-                                    'PLAYOFF_BYE': '😴',
-                                    'PLAYOFF_WC_WIN': 'WC',
-                                    'PLAYOFF_DIV_WIN': 'DIV',
-                                    'PLAYOFF_CONF_WIN': 'CONF',
-                                    'PLAYOFF_SB_WIN': '🏆'
-                                  }[detail.type] || '?'
-                                  return (
-                                    <span key={i} className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded font-bold">
-                                      {shortLabel}
-                                    </span>
-                                  )
-                                })}
-                              </div>
+                          {/* Playoffs Bar - Only shows if team has playoff earnings */}
+                          {teamHasPlayoffs && (
+                            <div className="mt-2 bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg px-3 py-1.5 text-center">
+                              <span className="font-black text-yellow-900 text-sm">🏈 Playoffs: ${team.playoffs}</span>
                             </div>
                           )}
                         </div>
