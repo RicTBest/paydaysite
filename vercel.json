@@ -5,6 +5,10 @@
       "schedule": "0 10 * * 2"
     },
     {
+      "path": "/api/cron/playoff-update",
+      "schedule": "0 10 * * 1"
+    },
+    {
       "path": "/api/fetch-games", 
       "schedule": "*/1 * * * *"
     }
