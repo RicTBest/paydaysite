@@ -691,7 +691,7 @@ useEffect(() => {
 
             const getDisplayName = (name) => {
               if (name === 'Will') return 'Dr. Finkel'
-              if (name === 'Joey') return 'Edmund Hillary'
+              if (name === 'Joey') return 'Sir Edmund Hillary'
               return name
             }
             
