@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Award types that use direct dollar amounts (not points * 5)
+const DIRECT_AMOUNT_TYPES = [
+  'PLAYOFF_BERTH', 'PLAYOFF_BYE', 'PLAYOFF_WC_WIN', 
+  'PLAYOFF_DIV_WIN', 'PLAYOFF_CONF_WIN', 'PLAYOFF_SB_WIN',
+  'FIRST_COACH_FIRED', 'DRAFT_PICK_1', 'MVP', 'DPOY', 
+  'COTY', 'MOST_SACKS', 'MOST_INTS', 'MOST_RET_TDS',
+  'COACH_FIRED' // Keep old type for backwards compatibility
+]
+
+// Playoff award types for the playoff bar
+const PLAYOFF_TYPES = [
+  'PLAYOFF_BERTH', 'PLAYOFF_BYE', 'PLAYOFF_WC_WIN', 
+  'PLAYOFF_DIV_WIN', 'PLAYOFF_CONF_WIN', 'PLAYOFF_SB_WIN'
+]
+
+// EOY award types
+const EOY_TYPES = [
+  'FIRST_COACH_FIRED', 'COACH_FIRED', 'DRAFT_PICK_1', 'MVP', 'DPOY', 
+  'COTY', 'MOST_SACKS', 'MOST_INTS', 'MOST_RET_TDS'
+]
+
 export default function Home() {
   const [leaderboard, setLeaderboard] = useState([])
   const [probabilities, setProbabilities] = useState({})
@@ -13,65 +34,55 @@ export default function Home() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [weekInfo, setWeekInfo] = useState(null)
-  const [userSelectedWeek, setUserSelectedWeek] = useState(false) // Track if user manually selected
+  const [userSelectedWeek, setUserSelectedWeek] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   useEffect(() => {
     loadCurrentWeek()
   }, [])
 
-useEffect(() => {
-  // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
-  const interval = setInterval(() => {
-    if (autoRefresh && !userSelectedWeek) {
-      console.log('Auto-refreshing data...')
-      loadCurrentWeek() // Changed from loadData() to loadCurrentWeek()
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (autoRefresh && !userSelectedWeek) {
+        console.log('Auto-refreshing data...')
+        loadCurrentWeek()
+      }
+    }, 1 * 60 * 1000)
+
+    return () => {
+      clearInterval(interval)
     }
-  }, 1 * 60 * 1000)
+  }, [autoRefresh, userSelectedWeek])
 
-  return () => {
-    clearInterval(interval)
-  }
-}, [autoRefresh, userSelectedWeek])
-
-
-  // Function to change week manually - this is the key fix
   function changeWeek(newWeek) {
     if (newWeek >= 1 && newWeek <= 18 && newWeek !== currentWeek) {
       console.log(`User manually changed week from ${currentWeek} to ${newWeek}`)
       setCurrentWeek(newWeek)
-      setUserSelectedWeek(true) // Remember that user made a manual selection
+      setUserSelectedWeek(true)
       
-      // Clear current data to show loading state
       setGames({})
       setProbabilities({})
       setGooseData({})
       
-      // Load data for the new week after state updates
       setTimeout(() => {
         loadDataForWeek(newWeek)
       }, 100)
     }
   }
 
-  // Separate function to load data for a specific week
   async function loadDataForWeek(weekNumber) {
     console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
     setLoading(true)
     
     try {
-      // Load all the base data first
       const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
       setLeaderboard(sortedLeaderboard)
 
-      // Then load week-specific data with the correct week number
       await Promise.all([
         loadProbabilitiesForWeek(teams, weekNumber),
         loadGamesForWeek(weekNumber)
       ])
 
-      // IMPORTANT: Load goose probabilities AFTER we have the correct probabilities
-      // We need to wait a bit for probabilities state to update
       setTimeout(async () => {
         await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
         setLastUpdate(new Date())
@@ -85,12 +96,21 @@ useEffect(() => {
     }
   }
 
-  // Modified loadData to use the current week in state
   async function loadData() {
     await loadDataForWeek(currentWeek)
   }
 
-  // Extract base data loading (awards, owners, teams) into separate function
+  // Helper function to calculate earnings from an award
+  function calculateAwardEarnings(award) {
+    if (DIRECT_AMOUNT_TYPES.includes(award.type)) {
+      // Direct dollar amount - use points as-is
+      return award.points || 0
+    } else {
+      // Regular award - multiply by 5
+      return (award.points || 1) * 5
+    }
+  }
+
   async function loadBaseData() {
     let awards = []
     try {
@@ -153,6 +173,9 @@ useEffect(() => {
           obo: 0,
           dbo: 0,
           eoy: 0,
+          eoyDollars: 0,  // Track actual EOY dollars
+          playoffs: 0,     // Track playoff dollars
+          playoffDetails: [], // Track playoff progress
           teams: {}
         }
       }
@@ -165,34 +188,58 @@ useEffect(() => {
           wins: 0,
           obo: 0,
           dbo: 0,
-          eoy: 0
+          eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: []
         }
       }
       
-      const points = award.points || 1
-      const earnings = points * 5
+      // Calculate earnings using the helper function
+      const earnings = calculateAwardEarnings(award)
       
       ownerStats[ownerId].totalEarnings += earnings
       ownerStats[ownerId].teams[teamAbbr].earnings += earnings
       
-      switch (award.type) {
-        case 'WIN':
-        case 'TIE_AWAY':
-          ownerStats[ownerId].wins += 1
-          ownerStats[ownerId].teams[teamAbbr].wins += 1
-          break
-        case 'OBO':
-          ownerStats[ownerId].obo += 1
-          ownerStats[ownerId].teams[teamAbbr].obo += 1
-          break
-        case 'DBO':
-          ownerStats[ownerId].dbo += 1
-          ownerStats[ownerId].teams[teamAbbr].dbo += 1
-          break
-        case 'COACH_FIRED':
-          ownerStats[ownerId].eoy += 1
-          ownerStats[ownerId].teams[teamAbbr].eoy += 1
-          break
+      // Categorize by award type
+      if (PLAYOFF_TYPES.includes(award.type)) {
+        // Playoff award
+        ownerStats[ownerId].playoffs += earnings
+        ownerStats[ownerId].teams[teamAbbr].playoffs += earnings
+        ownerStats[ownerId].playoffDetails.push({
+          team: teamAbbr,
+          type: award.type,
+          amount: earnings,
+          notes: award.notes
+        })
+        ownerStats[ownerId].teams[teamAbbr].playoffDetails.push({
+          type: award.type,
+          amount: earnings,
+          notes: award.notes
+        })
+      } else if (EOY_TYPES.includes(award.type)) {
+        // EOY award - track dollars directly
+        ownerStats[ownerId].eoy += 1
+        ownerStats[ownerId].eoyDollars += earnings
+        ownerStats[ownerId].teams[teamAbbr].eoy += 1
+        ownerStats[ownerId].teams[teamAbbr].eoyDollars += earnings
+      } else {
+        // Regular season award
+        switch (award.type) {
+          case 'WIN':
+          case 'TIE_AWAY':
+            ownerStats[ownerId].wins += 1
+            ownerStats[ownerId].teams[teamAbbr].wins += 1
+            break
+          case 'OBO':
+            ownerStats[ownerId].obo += 1
+            ownerStats[ownerId].teams[teamAbbr].obo += 1
+            break
+          case 'DBO':
+            ownerStats[ownerId].dbo += 1
+            ownerStats[ownerId].teams[teamAbbr].dbo += 1
+            break
+        }
       }
     })
 
@@ -211,6 +258,9 @@ useEffect(() => {
           obo: 0,
           dbo: 0,
           eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: [],
           teams: {}
         }
       }
@@ -223,7 +273,10 @@ useEffect(() => {
           wins: 0,
           obo: 0,
           dbo: 0,
-          eoy: 0
+          eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: []
         }
       }
     })
@@ -248,53 +301,44 @@ useEffect(() => {
     })
     allTeams.sort((a, b) => b.earnings - a.earnings)
     
-  // Sort all teams by earnings (highest to lowest)
-  allTeams.sort((a, b) => b.earnings - a.earnings)
-  
-  // Calculate quintile boundaries based on team positions, not unique values
-  const totalTeams = allTeams.length
-  const quintileBoundaries = [
-    Math.ceil(totalTeams * 0.2), // Top 20%
-    Math.ceil(totalTeams * 0.4), // Top 40% 
-    Math.ceil(totalTeams * 0.6), // Top 60%
-    Math.ceil(totalTeams * 0.8), // Top 80%
-    totalTeams                    // Bottom 100%
-  ]
+    const totalTeams = allTeams.length
+    const quintileBoundaries = [
+      Math.ceil(totalTeams * 0.2),
+      Math.ceil(totalTeams * 0.4),
+      Math.ceil(totalTeams * 0.6),
+      Math.ceil(totalTeams * 0.8),
+      totalTeams
+    ]
 
-  // Assign quintiles based on team position, but ensure ties stay together
-  allTeams.forEach((team, index) => {
-    // Find which quintile this position falls into
-    let quintile = 5 // Default to bottom quintile
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (index < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+    allTeams.forEach((team, index) => {
+      let quintile = 5
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (index < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
-    
-    // But if there are ties, promote lower-positioned tied teams to higher quintile
-    const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
-    const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
-    
-    // Recalculate quintile based on best position for this earnings group
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (bestPositionForThisEarning < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+      
+      const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
+      const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
+      
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (bestPositionForThisEarning < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
-    
-    // Convert quintile to percentile for your existing gradient logic
-    team.performancePercentile = quintile === 1 ? 0.9 :
-                                quintile === 2 ? 0.7 :
-                                quintile === 3 ? 0.5 :
-                                quintile === 4 ? 0.3 : 0.1
-  })
+      
+      team.performancePercentile = quintile === 1 ? 0.9 :
+                                  quintile === 2 ? 0.7 :
+                                  quintile === 3 ? 0.5 :
+                                  quintile === 4 ? 0.3 : 0.1
+    })
   
-  const teamPerformanceMap = {}
-  allTeams.forEach(team => {
-    teamPerformanceMap[team.abbr] = team.performancePercentile
-  })
+    const teamPerformanceMap = {}
+    allTeams.forEach(team => {
+      teamPerformanceMap[team.abbr] = team.performancePercentile
+    })
     
     sortedLeaderboard.forEach(owner => {
       owner.teamsSorted = Object.values(owner.teams)
@@ -426,13 +470,9 @@ useEffect(() => {
   }
 
   async function loadGooseProbabilitiesForWeek(owners, weekNumber) {
-
-    
     try {
       console.log(`Loading goose probabilities for Week ${weekNumber}`)
 
-
-      
       const goosePromises = owners.map(async (owner) => {
         const response = await fetch(`/api/goose-probability`, {
           method: 'POST',
@@ -441,9 +481,8 @@ useEffect(() => {
           },
           body: JSON.stringify({
             owner_id: owner.id,
-            week: weekNumber, // Use the specific week number
+            week: weekNumber,
             season: currentSeason
-            // Don't pass probabilities - let the API fetch them fresh for this week
           })
         })
         
@@ -460,9 +499,9 @@ useEffect(() => {
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
-      setGooseData({}) // Clear old data first
+      setGooseData({})
       setTimeout(() => {
-        setGooseData(gooseMap) // Set new data after brief delay
+        setGooseData(gooseMap)
       }, 50)
       console.log(`Goose probabilities loaded for Week ${weekNumber}`)
     } catch (error) {
@@ -488,9 +527,8 @@ useEffect(() => {
         setCurrentSeason(actualData.season)
         setActualWeek(actualData.week)
         
-        // Only use smart default on initial load, not if user has made a selection
         if (isInitialLoad) {
-          setCurrentWeek(displayData.week) // This sets it to 4
+          setCurrentWeek(displayData.week)
           setIsInitialLoad(false)
         }
         
@@ -500,9 +538,8 @@ useEffect(() => {
           dayOfWeek: displayData.dayOfWeek
         })
         
-        // FIXED: Use displayData.week directly instead of relying on state
         setTimeout(() => {
-          loadDataForWeek(displayData.week) // Pass Week 4 directly
+          loadDataForWeek(displayData.week)
         }, 100)
       }
     } catch (error) {
@@ -529,6 +566,29 @@ useEffect(() => {
       return `${dayName}: Showing Week ${weekInfo.display} (NFL is currently in Week ${weekInfo.actual})`
     }
     return `${dayName}: Showing current NFL Week ${weekInfo.display}`
+  }
+
+  // Helper to format playoff progress for display
+  function formatPlayoffProgress(playoffDetails) {
+    if (!playoffDetails || playoffDetails.length === 0) return null
+    
+    const typeLabels = {
+      'PLAYOFF_BERTH': 'Playoffs',
+      'PLAYOFF_BYE': 'Bye',
+      'PLAYOFF_WC_WIN': 'WC Win',
+      'PLAYOFF_DIV_WIN': 'Div Win',
+      'PLAYOFF_CONF_WIN': 'Conf Win',
+      'PLAYOFF_SB_WIN': '🏆 SB Champ'
+    }
+    
+    // Group by team
+    const byTeam = {}
+    playoffDetails.forEach(d => {
+      if (!byTeam[d.team]) byTeam[d.team] = []
+      byTeam[d.team].push(typeLabels[d.type] || d.type)
+    })
+    
+    return byTeam
   }
 
   if (loading && leaderboard.length === 0) {
@@ -672,6 +732,10 @@ useEffect(() => {
             const isLeader = rank === 1
             const isTop3 = rank <= 3
             
+            const playoffProgress = formatPlayoffProgress(owner.playoffDetails)
+            const hasPlayoffs = owner.playoffs > 0
+            const hasEOY = owner.eoyDollars > 0
+            
             const getRankEmoji = (rank) => {
               if (rank === 1) return '👑'
               if (rank === 2) return '🥈'
@@ -738,6 +802,7 @@ useEffect(() => {
                     </div>
                     
                     <div className="flex flex-col sm:text-right space-y-3">
+                      {/* Regular Season Stats */}
                       <div className="flex flex-wrap gap-2">
                         <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
                           🏆 {owner.wins}
@@ -749,9 +814,27 @@ useEffect(() => {
                           🛡️ {owner.dbo}
                         </span>
                         <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
-                          🏁 {owner.eoy}
+                          🏁 ${owner.eoyDollars || 0}
                         </span>
                       </div>
+                      
+                      {/* Playoff Bar - Only show if there are playoff earnings */}
+                      {hasPlayoffs && (
+                        <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 px-3 py-2 rounded-lg shadow-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-sm">🏈 PLAYOFFS: ${owner.playoffs}</span>
+                            {playoffProgress && (
+                              <div className="flex flex-wrap gap-1 ml-2">
+                                {Object.entries(playoffProgress).map(([team, stages]) => (
+                                  <span key={team} className="text-xs bg-yellow-200 px-2 py-0.5 rounded-full">
+                                    {team}: {stages.join(' → ')}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
                         goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
@@ -815,6 +898,8 @@ useEffect(() => {
                         team.performancePercentile >= 0.2 ? 'border-orange-300' :
                         'border-red-300'
                       
+                      const teamHasPlayoffs = team.playoffs > 0
+                      
                       return (
                         <div key={team.abbr} className={`bg-white rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 ${performanceBorder}`}>
                           <div className="flex justify-between items-start mb-3 sm:mb-4">
@@ -858,7 +943,8 @@ useEffect(() => {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1">
+                          {/* Stats Grid - Now 5 columns when playoffs exist */}
+                          <div className={`grid gap-1 sm:gap-1 ${teamHasPlayoffs ? 'grid-cols-5' : 'grid-cols-4'}`}>
                             <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2">
                               <div className="font-black text-blue-600 text-sm sm:text-lg">{team.wins}</div>
                               <div className="text-xs text-blue-500 font-bold">WINS</div>
@@ -872,10 +958,39 @@ useEffect(() => {
                               <div className="text-xs text-purple-500 font-bold">DBO</div>
                             </div>
                             <div className="text-center bg-red-50 rounded-lg p-1.5 sm:p-2">
-                              <div className="font-black text-red-600 text-sm sm:text-lg">{team.eoy}</div>
+                              <div className="font-black text-red-600 text-sm sm:text-lg">${team.eoyDollars || 0}</div>
                               <div className="text-xs text-red-500 font-bold">EOY</div>
                             </div>
+                            {teamHasPlayoffs && (
+                              <div className="text-center bg-yellow-100 rounded-lg p-1.5 sm:p-2">
+                                <div className="font-black text-yellow-700 text-sm sm:text-lg">${team.playoffs}</div>
+                                <div className="text-xs text-yellow-600 font-bold">PLAYOFF</div>
+                              </div>
+                            )}
                           </div>
+                          
+                          {/* Team Playoff Progress Bar */}
+                          {team.playoffDetails && team.playoffDetails.length > 0 && (
+                            <div className="mt-2 bg-gradient-to-r from-yellow-100 to-amber-100 rounded-lg px-2 py-1">
+                              <div className="flex flex-wrap gap-1">
+                                {team.playoffDetails.map((detail, i) => {
+                                  const shortLabel = {
+                                    'PLAYOFF_BERTH': '🎫',
+                                    'PLAYOFF_BYE': '😴',
+                                    'PLAYOFF_WC_WIN': 'WC',
+                                    'PLAYOFF_DIV_WIN': 'DIV',
+                                    'PLAYOFF_CONF_WIN': 'CONF',
+                                    'PLAYOFF_SB_WIN': '🏆'
+                                  }[detail.type] || '?'
+                                  return (
+                                    <span key={i} className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded font-bold">
+                                      {shortLabel}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
