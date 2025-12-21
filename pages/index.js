@@ -964,11 +964,11 @@ export default function Home() {
                           </div>
                           
                           {/* Playoffs Bar - Only shows if team has playoff earnings */}
-                          {teamHasPlayoffs && (
-                            <div className="mt-2 bg-gradient-to-r from-yellow-400 to-amber-400 rounded-lg px-3 py-1.5 text-center">
-                              <span className="font-black text-yellow-900 text-sm">🏈 Playoffs: ${team.playoffs}</span>
-                            </div>
-                          )}
+                            {teamHasPlayoffs && (
+                              <div className="mt-2 bg-yellow-50 rounded-lg px-3 py-1.5 text-center">
+                                <span className="font-black text-yellow-600 text-sm">🏈 Playoffs: ${team.playoffs}</span>
+                              </div>
+                            )}
                         </div>
                       )
                     })}
