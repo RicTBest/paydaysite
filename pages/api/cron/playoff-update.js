@@ -18,14 +18,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { season = 2025, round = null } = req.body
+    const { season = 2025, round = null, force = false } = req.body
     
-    console.log(`Processing playoff updates for season ${season}${round ? `, round: ${round}` : ''}`)
+    console.log(`Processing playoff updates for season ${season}${round ? `, round: ${round}` : ''}${force ? ' (FORCED)' : ''}`)
     
     let results
     
     if (round) {
-      // Process specific round only
+      // Process specific round only (bypasses playoff time check)
       if (round === 'BERTHS') {
         results = await PlayoffDataService.awardPlayoffBerths(season)
       } else {
@@ -33,7 +33,18 @@ export default async function handler(req, res) {
       }
     } else {
       // Process all playoff awards
-      results = await PlayoffDataService.updateAllPlayoffs(season)
+      results = await PlayoffDataService.updateAllPlayoffs(season, force)
+      
+      // If skipped due to timing, return early with explanation
+      if (results.skippedReason) {
+        return res.status(200).json({
+          success: false,
+          message: `Playoff update skipped: ${results.skippedReason}`,
+          season,
+          hint: 'Use "force": true to override this check (not recommended)',
+          timestamp: new Date().toISOString()
+        })
+      }
     }
     
     const totalAwarded = countAwarded(results)
