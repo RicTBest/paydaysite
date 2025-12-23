@@ -22,6 +22,8 @@ const OWNER_COLORS = {
   Joey: 'from-emerald-600 to-emerald-800'
 }
 
+const currentSeason = 2025
+
 export default function LOTATracker() {
   const [lotaData, setLotaData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -29,17 +31,188 @@ export default function LOTATracker() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
 
+  // Helper to check if a team won/lost a finished game
+  const getGameResult = (games, teamAbbr) => {
+    for (const game of games) {
+      const isHome = game.home === teamAbbr
+      const isAway = game.away === teamAbbr
+      
+      if (!isHome && !isAway) continue
+      
+      if (game.status !== 'STATUS_FINAL') return null
+      
+      const teamScore = isHome ? game.home_pts : game.away_pts
+      const oppScore = isHome ? game.away_pts : game.home_pts
+      
+      if (teamScore > oppScore) return 1
+      if (teamScore < oppScore) return 0
+      return 0.5
+    }
+    return null
+  }
+
+  // Calculate LOTA odds from raw data
+  const calculateLOTAOdds = (week17Probs, week18Probs, week17Games, week18Games) => {
+    // Get win probability - use actual result if game finished, else Kalshi odds
+    const getWinProb = (probs, games, team) => {
+      const result = getGameResult(games, team)
+      if (result !== null) return result
+      return probs[team]?.winProbability ?? 0.5
+    }
+
+    // Track game statuses for display
+    const gameStatuses = {
+      week17: {
+        raiders_vs_giants: getGameResult(week17Games, 'LV'),
+        jets_vs_patriots: getGameResult(week17Games, 'NYJ'),
+        browns_vs_steelers: getGameResult(week17Games, 'CLE')
+      },
+      week18: {
+        giants_vs_cowboys: getGameResult(week18Games, 'NYG'),
+        raiders_vs_chiefs: getGameResult(week18Games, 'LV'),
+        jets_vs_bills: getGameResult(week18Games, 'NYJ'),
+        browns_vs_bengals: getGameResult(week18Games, 'CLE')
+      }
+    }
+
+    // W17 probabilities
+    const P_raiders_w17 = getWinProb(week17Probs, week17Games, 'LV')
+    const P_jets_w17_win = getWinProb(week17Probs, week17Games, 'NYJ')
+    const P_browns_w17_win = getWinProb(week17Probs, week17Games, 'CLE')
+
+    // W18 probabilities
+    const P_giants_w18 = getWinProb(week18Probs, week18Games, 'NYG')
+    const P_raiders_w18 = getWinProb(week18Probs, week18Games, 'LV')
+    const P_jets_w18_win = getWinProb(week18Probs, week18Games, 'NYJ')
+    const P_browns_w18_win = getWinProb(week18Probs, week18Games, 'CLE')
+
+    // Derived probabilities
+    const P_browns_0_2 = (1 - P_browns_w17_win) * (1 - P_browns_w18_win)
+    const P_jets_0_2 = (1 - P_jets_w17_win) * (1 - P_jets_w18_win)
+
+    // Apply formulas
+    const P_giants = 
+      P_raiders_w17 * (1 - P_giants_w18) +
+      P_raiders_w17 * P_giants_w18 * (1 - P_browns_0_2) +
+      (1 - P_raiders_w17) * P_raiders_w18 * (1 - P_browns_0_2) * (1 - P_giants_w18)
+
+    const P_raiders = 
+      (1 - P_raiders_w17) * (1 - P_raiders_w18) +
+      (1 - P_raiders_w17) * P_raiders_w18 * (1 - P_browns_0_2) * P_giants_w18 * (1 - P_jets_0_2)
+
+    const P_browns = 
+      P_raiders_w17 * P_giants_w18 * P_browns_0_2 +
+      (1 - P_raiders_w17) * P_raiders_w18 * P_browns_0_2
+
+    const P_jets = 
+      (1 - P_raiders_w17) * P_raiders_w18 * (1 - P_browns_0_2) * P_giants_w18 * P_jets_0_2
+
+    // Owner mappings
+    const teamOwners = {
+      NYG: { name: 'Zack' },
+      LV: { name: 'Ric' },
+      NYJ: { name: 'Joey' },
+      CLE: { name: 'Ric' }
+    }
+
+    const ownerProbs = {}
+    const teamProbs = { NYG: P_giants, LV: P_raiders, NYJ: P_jets, CLE: P_browns }
+    
+    Object.entries(teamOwners).forEach(([team, owner]) => {
+      if (!ownerProbs[owner.name]) {
+        ownerProbs[owner.name] = { probability: 0, teams: [] }
+      }
+      ownerProbs[owner.name].probability += teamProbs[team]
+      ownerProbs[owner.name].teams.push(team)
+    })
+
+    const totalProb = P_giants + P_raiders + P_browns + P_jets
+
+    return {
+      timestamp: new Date().toISOString(),
+      season: currentSeason,
+      gameStatuses,
+      inputProbabilities: {
+        week17: {
+          raiders_beat_giants: P_raiders_w17,
+          jets_beat_patriots: P_jets_w17_win,
+          browns_beat_steelers: P_browns_w17_win
+        },
+        week18: {
+          giants_beat_cowboys: P_giants_w18,
+          raiders_beat_chiefs: P_raiders_w18,
+          jets_beat_bills: P_jets_w18_win,
+          browns_beat_bengals: P_browns_w18_win
+        },
+        derived: {
+          browns_go_0_2: P_browns_0_2,
+          jets_go_0_2: P_jets_0_2
+        }
+      },
+      teamProbabilities: {
+        NYG: { probability: P_giants, name: 'New York Giants', currentWins: 2 },
+        LV: { probability: P_raiders, name: 'Las Vegas Raiders', currentWins: 2 },
+        CLE: { probability: P_browns, name: 'Cleveland Browns', currentWins: 3 },
+        NYJ: { probability: P_jets, name: 'New York Jets', currentWins: 3 }
+      },
+      ownerProbabilities: ownerProbs,
+      probabilityCheck: {
+        total: totalProb,
+        isValid: Math.abs(totalProb - 1) < 0.01
+      },
+      notes: [
+        'Giants and Raiders play each other W17, so exactly one stays at 2 wins entering W18',
+        'Tiebreaker order: Browns > Giants > Jets > Raiders',
+        'Browns need to go 0-2 AND the 2-win team to win W18 to have a chance',
+        'Jets only get #1 in a very specific scenario chain'
+      ]
+    }
+  }
+
   const fetchLOTAData = useCallback(async () => {
     try {
-      const response = await fetch('/api/lota-odds?season=2024')
-      if (!response.ok) throw new Error('Failed to fetch LOTA data')
-      const data = await response.json()
-      setLotaData(data)
+      // Fetch all data in parallel - same pattern as index.js
+      const [week17ProbsRes, week18ProbsRes, week17GamesRes, week18GamesRes] = await Promise.all([
+        fetch(`/api/kalshi-probabilities?week=17&season=${currentSeason}`),
+        fetch(`/api/kalshi-probabilities?week=18&season=${currentSeason}`),
+        fetch(`/api/games?week=17&season=${currentSeason}`),
+        fetch(`/api/games?week=18&season=${currentSeason}`)
+      ])
+
+      let week17Probs = {}
+      let week18Probs = {}
+      let week17Games = []
+      let week18Games = []
+
+      if (week17ProbsRes.ok) {
+        const data = await week17ProbsRes.json()
+        week17Probs = data.probabilities || {}
+        console.log('Week 17 probs:', week17Probs)
+      }
+
+      if (week18ProbsRes.ok) {
+        const data = await week18ProbsRes.json()
+        week18Probs = data.probabilities || {}
+        console.log('Week 18 probs:', week18Probs)
+      }
+
+      if (week17GamesRes.ok) {
+        const data = await week17GamesRes.json()
+        week17Games = data.games || []
+      }
+
+      if (week18GamesRes.ok) {
+        const data = await week18GamesRes.json()
+        week18Games = data.games || []
+      }
+
+      const calculatedData = calculateLOTAOdds(week17Probs, week18Probs, week17Games, week18Games)
+      setLotaData(calculatedData)
       setLastUpdate(new Date())
       setError(null)
     } catch (err) {
       console.error('LOTA fetch error:', err)
-      setError(err?.message || 'Unknown error')
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -71,25 +244,23 @@ export default function LOTATracker() {
   // Format probability with lock indicator if game is finished
   const formatProbWithStatus = (prob, status) => {
     const pctStr = formatPercent(prob)
-    if (status === null || status === undefined) return { text: pctStr, isLocked: false }
-    return {
+    if (status === null) return { text: pctStr, isLocked: false }
+    return { 
       text: status === 1 ? '✅ WON' : status === 0 ? '❌ LOST' : '🟡 TIE',
-      isLocked: true
+      isLocked: true 
     }
   }
 
   // Sort teams by probability descending
-  const sortedTeams = lotaData?.teamProbabilities
-    ? Object.entries(lotaData.teamProbabilities).sort(
-        ([, a], [, b]) => (b?.probability ?? 0) - (a?.probability ?? 0)
-      )
+  const sortedTeams = lotaData?.teamProbabilities 
+    ? Object.entries(lotaData.teamProbabilities)
+        .sort(([,a], [,b]) => b.probability - a.probability)
     : []
 
   // Sort owners by probability descending
   const sortedOwners = lotaData?.ownerProbabilities
-    ? Object.entries(lotaData.ownerProbabilities).sort(
-        ([, a], [, b]) => (b?.probability ?? 0) - (a?.probability ?? 0)
-      )
+    ? Object.entries(lotaData.ownerProbabilities)
+        .sort(([,a], [,b]) => b.probability - a.probability)
     : []
 
   return (
@@ -139,17 +310,16 @@ export default function LOTATracker() {
                 <span className="text-sm">Auto-refresh (60s)</span>
               </label>
             </div>
-
             <div className="text-sm text-slate-400">
-              {lastUpdate && <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>}
+              {lastUpdate && (
+                <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+              )}
               {lotaData?.probabilityCheck && (
-                <span
-                  className={`ml-4 px-2 py-1 rounded text-xs ${
-                    lotaData.probabilityCheck.isValid
-                      ? 'bg-green-900/50 text-green-300'
-                      : 'bg-red-900/50 text-red-300'
-                  }`}
-                >
+                <span className={`ml-4 px-2 py-1 rounded text-xs ${
+                  lotaData.probabilityCheck.isValid 
+                    ? 'bg-green-900/50 text-green-300' 
+                    : 'bg-red-900/50 text-red-300'
+                }`}>
                   Σ = {formatPercent(lotaData.probabilityCheck.total)}
                 </span>
               )}
@@ -176,11 +346,7 @@ export default function LOTATracker() {
                     index === 0 ? 'ring-4 ring-yellow-400 ring-opacity-50' : ''
                   }`}
                 >
-                  <div
-                    className={`bg-gradient-to-br ${
-                      OWNER_COLORS[name] || 'from-gray-600 to-gray-800'
-                    } p-6`}
-                  >
+                  <div className={`bg-gradient-to-br ${OWNER_COLORS[name] || 'from-gray-600 to-gray-800'} p-6`}>
                     {index === 0 && (
                       <div className="absolute top-2 right-2 text-4xl animate-bounce">👑</div>
                     )}
@@ -188,7 +354,7 @@ export default function LOTATracker() {
                       <div>
                         <h3 className="text-3xl font-black text-white">{name}</h3>
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {data.teams.map((team) => (
+                          {data.teams.map(team => (
                             <img
                               key={team}
                               src={TEAM_LOGOS[team]}
@@ -202,16 +368,17 @@ export default function LOTATracker() {
                         <div className="text-5xl font-black text-white drop-shadow-lg">
                           {formatPercentLarge(data.probability)}
                         </div>
-                        <div className="text-sm text-white/70 mt-1">chance at #1</div>
+                        <div className="text-sm text-white/70 mt-1">
+                          chance at #1
+                        </div>
                       </div>
                     </div>
                   </div>
-
                   {/* Progress bar */}
                   <div className="h-2 bg-black/30">
-                    <div
+                    <div 
                       className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-1000"
-                      style={{ width: `${Math.min((data.probability ?? 0) * 100, 100)}%` }}
+                      style={{ width: `${Math.min(data.probability * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -233,11 +400,7 @@ export default function LOTATracker() {
                     index === 0 ? 'ring-4 ring-yellow-400' : 'ring-1 ring-slate-600'
                   }`}
                 >
-                  <div
-                    className={`bg-gradient-to-br ${
-                      TEAM_COLORS[abbr]?.bg || 'from-gray-700 to-gray-900'
-                    } p-5`}
-                  >
+                  <div className={`bg-gradient-to-br ${TEAM_COLORS[abbr]?.bg || 'from-gray-700 to-gray-900'} p-5`}>
                     {index === 0 && (
                       <div className="absolute top-2 right-2">
                         <span className="bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded-full">
@@ -256,16 +419,17 @@ export default function LOTATracker() {
                         <div className="text-4xl font-black text-white">
                           {formatPercentLarge(data.probability)}
                         </div>
-                        <div className="text-sm text-white/70">{data.currentWins} wins</div>
+                        <div className="text-sm text-white/70">
+                          {data.currentWins} wins
+                        </div>
                       </div>
                     </div>
                   </div>
-
                   {/* Progress bar */}
                   <div className="h-1.5 bg-black/40">
-                    <div
+                    <div 
                       className="h-full bg-gradient-to-r from-yellow-300 to-amber-400 transition-all duration-1000"
-                      style={{ width: `${Math.min((data.probability ?? 0) * 100, 100)}%` }}
+                      style={{ width: `${Math.min(data.probability * 100, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -287,106 +451,47 @@ export default function LOTATracker() {
                     <div className="space-y-3">
                       {(() => {
                         const status = lotaData.gameStatuses?.week17?.raiders_vs_giants
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week17.raiders_beat_giants,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week17.raiders_beat_giants, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.LV}
-                                alt="LV"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.LV} alt="LV" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Raiders beat Giants
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
                         )
                       })()}
-
                       {(() => {
                         const status = lotaData.gameStatuses?.week17?.jets_vs_patriots
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week17.jets_beat_patriots,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week17.jets_beat_patriots, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.NYJ}
-                                alt="NYJ"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.NYJ} alt="NYJ" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Jets beat Patriots
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
                         )
                       })()}
-
                       {(() => {
                         const status = lotaData.gameStatuses?.week17?.browns_vs_steelers
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week17.browns_beat_steelers,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week17.browns_beat_steelers, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.CLE}
-                                alt="CLE"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.CLE} alt="CLE" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Browns beat Steelers
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
@@ -401,142 +506,63 @@ export default function LOTATracker() {
                     <div className="space-y-3">
                       {(() => {
                         const status = lotaData.gameStatuses?.week18?.giants_vs_cowboys
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week18.giants_beat_cowboys,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week18.giants_beat_cowboys, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.NYG}
-                                alt="NYG"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.NYG} alt="NYG" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Giants beat Cowboys
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
                         )
                       })()}
-
                       {(() => {
                         const status = lotaData.gameStatuses?.week18?.raiders_vs_chiefs
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week18.raiders_beat_chiefs,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week18.raiders_beat_chiefs, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.LV}
-                                alt="LV"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.LV} alt="LV" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Raiders beat Chiefs
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
                         )
                       })()}
-
                       {(() => {
                         const status = lotaData.gameStatuses?.week18?.jets_vs_bills
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week18.jets_beat_bills,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week18.jets_beat_bills, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.NYJ}
-                                alt="NYJ"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.NYJ} alt="NYJ" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Jets beat Bills
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
                         )
                       })()}
-
                       {(() => {
                         const status = lotaData.gameStatuses?.week18?.browns_vs_bengals
-                        const display = formatProbWithStatus(
-                          lotaData.inputProbabilities.week18.browns_beat_bengals,
-                          status
-                        )
+                        const display = formatProbWithStatus(lotaData.inputProbabilities.week18.browns_beat_bengals, status)
                         return (
-                          <div
-                            className={`flex justify-between items-center rounded-lg p-3 ${
-                              display.isLocked
-                                ? 'bg-slate-600/70 ring-2 ring-amber-500/50'
-                                : 'bg-slate-700/50'
-                            }`}
-                          >
+                          <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
                             <span className="text-slate-300">
-                              <img
-                                src={TEAM_LOGOS.CLE}
-                                alt="CLE"
-                                className="w-6 h-6 inline mr-2 bg-white rounded-full"
-                              />
+                              <img src={TEAM_LOGOS.CLE} alt="CLE" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                               Browns beat Bengals
-                              {display.isLocked && (
-                                <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>
-                              )}
+                              {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                             </span>
-                            <span
-                              className={`font-mono font-bold ${
-                                display.isLocked ? 'text-amber-300' : 'text-white'
-                              }`}
-                            >
+                            <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
                               {display.text}
                             </span>
                           </div>
@@ -583,16 +609,11 @@ export default function LOTATracker() {
               </div>
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <h3 className="font-bold text-amber-400 mb-2">Tiebreaker Order</h3>
-                <p>
-                  If teams finish with the same record: <strong>Browns → Giants → Jets → Raiders</strong>
-                </p>
+                <p>If teams finish with the same record: <strong>Browns → Giants → Jets → Raiders</strong></p>
               </div>
               <div className="bg-slate-700/50 rounded-lg p-4">
                 <h3 className="font-bold text-amber-400 mb-2">Key Week 17 Game</h3>
-                <p>
-                  Giants @ Raiders — these two play each other! Exactly one team will stay at 2 wins entering
-                  Week 18.
-                </p>
+                <p>Giants @ Raiders — these two play each other! Exactly one team will stay at 2 wins entering Week 18.</p>
               </div>
               {lotaData?.notes && (
                 <div className="bg-slate-700/50 rounded-lg p-4">
