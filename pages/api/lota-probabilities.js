@@ -4,6 +4,14 @@ import { supabase } from '../../lib/supabase'
 // Only the teams we care about for LOTA
 const LOTA_TEAMS = ['NYG', 'LV', 'NYJ', 'CLE']
 
+// Week 18 fallback probabilities (from betting lines when Kalshi doesn't have markets yet)
+const WEEK18_FALLBACKS = {
+  NYG: 0.378,  // Cowboys @ Giants - Giants 37.8%
+  LV: 0.518,   // Chiefs @ Raiders - Raiders 51.8%
+  NYJ: 0.077,  // Jets @ Bills - Jets 7.7%
+  CLE: 0.25    // Browns @ Bengals - Browns 25.0%
+}
+
 // Team abbreviation mapping for Kalshi
 const KALSHI_TEAM_MAPPING = {
   'NYG': 'NYG',
@@ -118,10 +126,19 @@ export default async function handler(req, res) {
           week18Probs[team] = { winProbability: teamWon ? 1.0 : 0.0, confidence: 'final' }
         } else if (apiKey) {
           const kalshiData = await getKalshiProbability(w18Game.home, w18Game.away, w18Game.kickoff, team, apiKey)
-          week18Probs[team] = { winProbability: kalshiData.probability, confidence: kalshiData.confidence }
+          // If Kalshi failed, use hardcoded fallback
+          if (kalshiData.confidence === 'fallback' && WEEK18_FALLBACKS[team]) {
+            week18Probs[team] = { winProbability: WEEK18_FALLBACKS[team], confidence: 'betting-lines' }
+          } else {
+            week18Probs[team] = { winProbability: kalshiData.probability, confidence: kalshiData.confidence }
+          }
         } else {
-          week18Probs[team] = { winProbability: 0.5, confidence: 'no-api' }
+          // No API key - use hardcoded fallback
+          week18Probs[team] = { winProbability: WEEK18_FALLBACKS[team] || 0.5, confidence: 'betting-lines' }
         }
+      } else {
+        // No game found in DB yet - use hardcoded fallback
+        week18Probs[team] = { winProbability: WEEK18_FALLBACKS[team] || 0.5, confidence: 'betting-lines' }
       }
     }
 
