@@ -1,5 +1,5 @@
 // LOTA (Luck of the Andrew) - #1 NFL Draft Pick Probability Calculator
-// Uses Kalshi win probabilities to calculate each team’s chance at #1 overall
+// Uses Kalshi win probabilities to calculate each team's chance at #1 overall
 
 export default async function handler(req, res) {
 const season = req.query.season || 2025
@@ -7,13 +7,13 @@ const season = req.query.season || 2025
 try {
 // Fetch Kalshi probabilities for Week 17 and Week 18, plus game results
 const [week17Response, week18Response, week17GamesResponse, week18GamesResponse] = await Promise.all([
-fetch(`${getBaseUrl(req)}/api/kalshi-probabilities?week=17&season=${season}`),
-fetch(`${getBaseUrl(req)}/api/kalshi-probabilities?week=18&season=${season}`),
-fetch(`${getBaseUrl(req)}/api/games?week=17&season=${season}`),
-fetch(`${getBaseUrl(req)}/api/games?week=18&season=${season}`)
+fetch('${getBaseUrl(req)}/api/kalshi-probabilities?week=17&season=${season}'),
+fetch('${getBaseUrl(req)}/api/kalshi-probabilities?week=18&season=${season}'),
+fetch('${getBaseUrl(req)}/api/games?week=17&season=${season}'),
+fetch('${getBaseUrl(req)}/api/games?week=18&season=${season}')
 ])
 
-```
+'''
 let week17Probs = {}
 let week18Probs = {}
 let week17Games = []
@@ -213,16 +213,16 @@ result.probabilityCheck = {
 }
 
 res.status(200).json(result)
-```
+'''
 
 } catch (error) {
-console.error(‘LOTA odds calculation error:’, error)
+console.error('LOTA odds calculation error:', error)
 res.status(500).json({ error: error.message })
 }
 }
 
 function getBaseUrl(req) {
-const protocol = req.headers[‘x-forwarded-proto’] || ‘http’
+const protocol = req.headers['x-forwarded-proto'] || 'http'
 const host = req.headers.host
-return `${protocol}://${host}`
+return '${protocol}://${host}'
 }
