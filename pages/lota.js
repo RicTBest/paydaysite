@@ -30,7 +30,6 @@ export default function LOTATracker() {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
-  const [debugInfo, setDebugInfo] = useState(null)
 
   // Helper to check if a game result is locked (from Kalshi confidence field)
   const isGameLocked = (prob) => {
@@ -163,8 +162,6 @@ export default function LOTATracker() {
 
   const fetchLOTAData = useCallback(async () => {
     try {
-      setDebugInfo({ status: 'fetching LOTA probabilities...' })
-      
       // Use dedicated LOTA endpoint that only fetches the 4 teams we need
       const response = await fetch(`/api/lota-probabilities?season=${currentSeason}`)
       
@@ -175,12 +172,6 @@ export default function LOTATracker() {
       const data = await response.json()
       console.log('LOTA data:', data)
 
-      setDebugInfo({
-        week17: data.week17,
-        week18: data.week18,
-        gamesFound: data.gamesFound
-      })
-
       const calculatedData = calculateLOTAOdds(data.week17 || {}, data.week18 || {})
       setLotaData(calculatedData)
       setLastUpdate(new Date())
@@ -188,7 +179,6 @@ export default function LOTATracker() {
     } catch (err) {
       console.error('LOTA fetch error:', err)
       setError(`${err.name}: ${err.message}`)
-      setDebugInfo({ error: err.toString() })
     } finally {
       setLoading(false)
     }
@@ -305,17 +295,6 @@ export default function LOTATracker() {
           {error && (
             <div className="bg-red-900/50 border border-red-500 text-red-200 rounded-xl p-4 mb-8">
               <strong>Error:</strong> {error}
-              {debugInfo && (
-                <pre className="mt-2 text-xs overflow-auto">
-                  {JSON.stringify(debugInfo, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
-          
-          {debugInfo && !error && (
-            <div className="bg-blue-900/50 border border-blue-500 text-blue-200 rounded-xl p-4 mb-8 text-xs">
-              <strong>Debug:</strong> <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
           )}
 
