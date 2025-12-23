@@ -57,15 +57,15 @@ return () => clearInterval(interval)
 
 const formatPercent = (prob) => {
 if (prob === undefined || prob === null) return '—'
-return `${(prob * 100).toFixed(1)}%`
+return '${(prob * 100).toFixed(1)}%'
 }
 
 const formatPercentLarge = (prob) => {
 if (prob === undefined || prob === null) return '—'
 const pct = prob * 100
-if (pct >= 10) return `${pct.toFixed(0)}%`
-if (pct >= 1) return `${pct.toFixed(1)}%`
-return `${pct.toFixed(2)}%`
+if (pct >= 10) return '${pct.toFixed(0)}%'
+if (pct >= 1) return '${pct.toFixed(1)}%'
+return '${pct.toFixed(2)}%'
 }
 
 // Format probability with lock indicator if game is finished
@@ -98,7 +98,7 @@ return (
 <link rel="icon" href="/favicon.ico" />
 </Head>
 
-```
+'''
   <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
     {/* Header */}
     <div className="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 py-6 shadow-2xl">
@@ -143,11 +143,11 @@ return (
             <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
           )}
           {lotaData?.probabilityCheck && (
-            <span className={`ml-4 px-2 py-1 rounded text-xs ${
+            <span className={'ml-4 px-2 py-1 rounded text-xs ${
               lotaData.probabilityCheck.isValid 
                 ? 'bg-green-900/50 text-green-300' 
                 : 'bg-red-900/50 text-red-300'
-            }`}>
+            }'}>
               Σ = {formatPercent(lotaData.probabilityCheck.total)}
             </span>
           )}
@@ -170,11 +170,11 @@ return (
           {sortedOwners.map(([name, data], index) => (
             <div
               key={name}
-              className={`relative overflow-hidden rounded-2xl shadow-2xl transform transition-all hover:scale-105 ${
+              className={'relative overflow-hidden rounded-2xl shadow-2xl transform transition-all hover:scale-105 ${
                 index === 0 ? 'ring-4 ring-yellow-400 ring-opacity-50' : ''
-              }`}
+              }'}
             >
-              <div className={`bg-gradient-to-br ${OWNER_COLORS[name] || 'from-gray-600 to-gray-800'} p-6`}>
+              <div className={'bg-gradient-to-br ${OWNER_COLORS[name] || 'from-gray-600 to-gray-800'} p-6'}>
                 {index === 0 && (
                   <div className="absolute top-2 right-2 text-4xl animate-bounce">👑</div>
                 )}
@@ -206,7 +206,7 @@ return (
               <div className="h-2 bg-black/30">
                 <div 
                   className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-1000"
-                  style={{ width: `${Math.min(data.probability * 100, 100)}%` }}
+                  style={{ width: '${Math.min(data.probability * 100, 100)}%' }}
                 />
               </div>
             </div>
@@ -224,11 +224,11 @@ return (
           {sortedTeams.map(([abbr, data], index) => (
             <div
               key={abbr}
-              className={`relative overflow-hidden rounded-2xl shadow-xl transition-all hover:shadow-2xl transform hover:-translate-y-1 ${
+              className={'relative overflow-hidden rounded-2xl shadow-xl transition-all hover:shadow-2xl transform hover:-translate-y-1 ${
                 index === 0 ? 'ring-4 ring-yellow-400' : 'ring-1 ring-slate-600'
-              }`}
+              }'}
             >
-              <div className={`bg-gradient-to-br ${TEAM_COLORS[abbr]?.bg || 'from-gray-700 to-gray-900'} p-5`}>
+              <div className={'bg-gradient-to-br ${TEAM_COLORS[abbr]?.bg || 'from-gray-700 to-gray-900'} p-5'}>
                 {index === 0 && (
                   <div className="absolute top-2 right-2">
                     <span className="bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-1 rounded-full">
@@ -257,7 +257,7 @@ return (
               <div className="h-1.5 bg-black/40">
                 <div 
                   className="h-full bg-gradient-to-r from-yellow-300 to-amber-400 transition-all duration-1000"
-                  style={{ width: `${Math.min(data.probability * 100, 100)}%` }}
+                  style={{ width: '${Math.min(data.probability * 100, 100)}%' }}
                 />
               </div>
             </div>
@@ -281,13 +281,13 @@ return (
                     const status = lotaData.gameStatuses?.week17?.raiders_vs_giants
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week17.raiders_beat_giants, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.LV} alt="LV" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Raiders beat Giants
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -297,13 +297,13 @@ return (
                     const status = lotaData.gameStatuses?.week17?.jets_vs_patriots
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week17.jets_beat_patriots, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.NYJ} alt="NYJ" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Jets beat Patriots
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -313,13 +313,13 @@ return (
                     const status = lotaData.gameStatuses?.week17?.browns_vs_steelers
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week17.browns_beat_steelers, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.CLE} alt="CLE" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Browns beat Steelers
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -336,13 +336,13 @@ return (
                     const status = lotaData.gameStatuses?.week18?.giants_vs_cowboys
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week18.giants_beat_cowboys, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.NYG} alt="NYG" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Giants beat Cowboys
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -352,13 +352,13 @@ return (
                     const status = lotaData.gameStatuses?.week18?.raiders_vs_chiefs
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week18.raiders_beat_chiefs, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.LV} alt="LV" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Raiders beat Chiefs
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -368,13 +368,13 @@ return (
                     const status = lotaData.gameStatuses?.week18?.jets_vs_bills
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week18.jets_beat_bills, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.NYJ} alt="NYJ" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Jets beat Bills
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -384,13 +384,13 @@ return (
                     const status = lotaData.gameStatuses?.week18?.browns_vs_bengals
                     const display = formatProbWithStatus(lotaData.inputProbabilities.week18.browns_beat_bengals, status)
                     return (
-                      <div className={`flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}`}>
+                      <div className={'flex justify-between items-center rounded-lg p-3 ${display.isLocked ? 'bg-slate-600/70 ring-2 ring-amber-500/50' : 'bg-slate-700/50'}'}>
                         <span className="text-slate-300">
                           <img src={TEAM_LOGOS.CLE} alt="CLE" className="w-6 h-6 inline mr-2 bg-white rounded-full" />
                           Browns beat Bengals
                           {display.isLocked && <span className="ml-2 text-xs text-amber-400">🔒 FINAL</span>}
                         </span>
-                        <span className={`font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}`}>
+                        <span className={'font-mono font-bold ${display.isLocked ? 'text-amber-300' : 'text-white'}'}>
                           {display.text}
                         </span>
                       </div>
@@ -467,7 +467,7 @@ return (
     </div>
   </div>
 </>
-```
+'''
 
 )
 }
