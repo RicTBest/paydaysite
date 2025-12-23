@@ -30,6 +30,7 @@ export default function LOTATracker() {
   const [error, setError] = useState(null)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [debugInfo, setDebugInfo] = useState(null)
 
   // Helper to check if a game result is locked (from Kalshi confidence field)
   const isGameLocked = (prob) => {
@@ -162,11 +163,16 @@ export default function LOTATracker() {
 
   const fetchLOTAData = useCallback(async () => {
     try {
+      setDebugInfo({ status: 'fetching...' })
+      
       // Fetch Kalshi probabilities - these already include finished game results!
-      const [week17ProbsRes, week18ProbsRes] = await Promise.all([
-        fetch(`/api/kalshi-probabilities?week=17&season=${currentSeason}`),
-        fetch(`/api/kalshi-probabilities?week=18&season=${currentSeason}`)
-      ])
+      const week17Url = `/api/kalshi-probabilities?week=17&season=${currentSeason}`
+      const week18Url = `/api/kalshi-probabilities?week=18&season=${currentSeason}`
+      
+      console.log('Fetching:', week17Url, week18Url)
+      
+      const week17ProbsRes = await fetch(week17Url)
+      const week18ProbsRes = await fetch(week18Url)
 
       let week17Probs = {}
       let week18Probs = {}
@@ -175,13 +181,24 @@ export default function LOTATracker() {
         const data = await week17ProbsRes.json()
         week17Probs = data.probabilities || {}
         console.log('Week 17 probs:', week17Probs)
+      } else {
+        console.error('Week 17 fetch failed:', week17ProbsRes.status, week17ProbsRes.statusText)
       }
 
       if (week18ProbsRes.ok) {
         const data = await week18ProbsRes.json()
         week18Probs = data.probabilities || {}
         console.log('Week 18 probs:', week18Probs)
+      } else {
+        console.error('Week 18 fetch failed:', week18ProbsRes.status, week18ProbsRes.statusText)
       }
+
+      setDebugInfo({
+        week17Teams: Object.keys(week17Probs).length,
+        week18Teams: Object.keys(week18Probs).length,
+        week17Sample: week17Probs['NYG'] || week17Probs['LV'] || 'none',
+        week18Sample: week18Probs['NYG'] || week18Probs['LV'] || 'none'
+      })
 
       const calculatedData = calculateLOTAOdds(week17Probs, week18Probs)
       setLotaData(calculatedData)
@@ -189,7 +206,8 @@ export default function LOTATracker() {
       setError(null)
     } catch (err) {
       console.error('LOTA fetch error:', err)
-      setError(err.message)
+      setError(`${err.name}: ${err.message}`)
+      setDebugInfo({ error: err.toString(), stack: err.stack })
     } finally {
       setLoading(false)
     }
@@ -306,6 +324,17 @@ export default function LOTATracker() {
           {error && (
             <div className="bg-red-900/50 border border-red-500 text-red-200 rounded-xl p-4 mb-8">
               <strong>Error:</strong> {error}
+              {debugInfo && (
+                <pre className="mt-2 text-xs overflow-auto">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
+          
+          {debugInfo && !error && (
+            <div className="bg-blue-900/50 border border-blue-500 text-blue-200 rounded-xl p-4 mb-8 text-xs">
+              <strong>Debug:</strong> <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
           )}
 
