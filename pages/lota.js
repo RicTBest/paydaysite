@@ -1,25 +1,25 @@
-import { useState, useEffect, useCallback } from ‘react’
-import Head from ‘next/head’
+import { useState, useEffect, useCallback } from 'react'
+import Head from 'next/head'
 
 // NFL Team logos from ESPN CDN
 const TEAM_LOGOS = {
-NYG: ‘https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png’,
-LV: ‘https://a.espncdn.com/i/teamlogos/nfl/500/lv.png’,
-NYJ: ‘https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png’,
-CLE: ‘https://a.espncdn.com/i/teamlogos/nfl/500/cle.png’
+NYG: 'https://a.espncdn.com/i/teamlogos/nfl/500/nyg.png',
+LV: 'https://a.espncdn.com/i/teamlogos/nfl/500/lv.png',
+NYJ: 'https://a.espncdn.com/i/teamlogos/nfl/500/nyj.png',
+CLE: 'https://a.espncdn.com/i/teamlogos/nfl/500/cle.png'
 }
 
 const TEAM_COLORS = {
-NYG: { primary: ‘#0B2265’, secondary: ‘#A71930’, bg: ‘from-blue-900 to-red-800’ },
-LV: { primary: ‘#000000’, secondary: ‘#A5ACAF’, bg: ‘from-black to-gray-600’ },
-NYJ: { primary: ‘#125740’, secondary: ‘#000000’, bg: ‘from-green-800 to-green-950’ },
-CLE: { primary: ‘#311D00’, secondary: ‘#FF3C00’, bg: ‘from-orange-700 to-amber-900’ }
+NYG: { primary: '#0B2265', secondary: '#A71930', bg: 'from-blue-900 to-red-800' },
+LV: { primary: '#000000', secondary: '#A5ACAF', bg: 'from-black to-gray-600' },
+NYJ: { primary: '#125740', secondary: '#000000', bg: 'from-green-800 to-green-950' },
+CLE: { primary: '#311D00', secondary: '#FF3C00', bg: 'from-orange-700 to-amber-900' }
 }
 
 const OWNER_COLORS = {
-Ric: ‘from-purple-600 to-purple-800’,
-Zack: ‘from-blue-600 to-blue-800’,
-Joey: ‘from-emerald-600 to-emerald-800’
+Ric: 'from-purple-600 to-purple-800',
+Zack: 'from-blue-600 to-blue-800',
+Joey: 'from-emerald-600 to-emerald-800'
 }
 
 export default function LOTATracker() {
@@ -31,14 +31,14 @@ const [autoRefresh, setAutoRefresh] = useState(true)
 
 const fetchLOTAData = useCallback(async () => {
 try {
-const response = await fetch(’/api/lota-odds?season=2024’)
-if (!response.ok) throw new Error(‘Failed to fetch LOTA data’)
+const response = await fetch('/api/lota-odds?season=2024')
+if (!response.ok) throw new Error('Failed to fetch LOTA data')
 const data = await response.json()
 setLotaData(data)
 setLastUpdate(new Date())
 setError(null)
 } catch (err) {
-console.error(‘LOTA fetch error:’, err)
+console.error('LOTA fetch error:', err)
 setError(err.message)
 } finally {
 setLoading(false)
@@ -56,12 +56,12 @@ return () => clearInterval(interval)
 }, [autoRefresh, fetchLOTAData])
 
 const formatPercent = (prob) => {
-if (prob === undefined || prob === null) return ‘—’
+if (prob === undefined || prob === null) return '—'
 return `${(prob * 100).toFixed(1)}%`
 }
 
 const formatPercentLarge = (prob) => {
-if (prob === undefined || prob === null) return ‘—’
+if (prob === undefined || prob === null) return '—'
 const pct = prob * 100
 if (pct >= 10) return `${pct.toFixed(0)}%`
 if (pct >= 1) return `${pct.toFixed(1)}%`
@@ -73,7 +73,7 @@ const formatProbWithStatus = (prob, status) => {
 const pctStr = formatPercent(prob)
 if (status === null) return { text: pctStr, isLocked: false }
 return {
-text: status === 1 ? ‘✅ WON’ : status === 0 ? ‘❌ LOST’ : ‘🟡 TIE’,
+text: status === 1 ? '✅ WON' : status === 0 ? '❌ LOST' : '🟡 TIE',
 isLocked: true
 }
 }
