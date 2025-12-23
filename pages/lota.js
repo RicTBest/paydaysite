@@ -31,60 +31,51 @@ export default function LOTATracker() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
 
-  // Helper to check if a team won/lost a finished game
-  const getGameResult = (games, teamAbbr) => {
-    for (const game of games) {
-      const isHome = game.home === teamAbbr
-      const isAway = game.away === teamAbbr
-      
-      if (!isHome && !isAway) continue
-      
-      if (game.status !== 'STATUS_FINAL') return null
-      
-      const teamScore = isHome ? game.home_pts : game.away_pts
-      const oppScore = isHome ? game.away_pts : game.home_pts
-      
-      if (teamScore > oppScore) return 1
-      if (teamScore < oppScore) return 0
-      return 0.5
-    }
-    return null
+  // Helper to check if a game result is locked (from Kalshi confidence field)
+  const isGameLocked = (prob) => {
+    return prob?.confidence === 'final'
   }
 
-  // Calculate LOTA odds from raw data
-  const calculateLOTAOdds = (week17Probs, week18Probs, week17Games, week18Games) => {
-    // Get win probability - use actual result if game finished, else Kalshi odds
-    const getWinProb = (probs, games, team) => {
-      const result = getGameResult(games, team)
-      if (result !== null) return result
+  // Calculate LOTA odds from Kalshi probability data
+  const calculateLOTAOdds = (week17Probs, week18Probs) => {
+    // Get win probability for a team
+    const getWinProb = (probs, team) => {
       return probs[team]?.winProbability ?? 0.5
     }
 
-    // Track game statuses for display
+    // Track game statuses for display (null = pending, 0 = lost, 1 = won)
+    const getGameStatus = (probs, team) => {
+      const prob = probs[team]
+      if (prob?.confidence === 'final') {
+        return prob.winProbability // Will be 1 or 0
+      }
+      return null // Game not finished
+    }
+
     const gameStatuses = {
       week17: {
-        raiders_vs_giants: getGameResult(week17Games, 'LV'),
-        jets_vs_patriots: getGameResult(week17Games, 'NYJ'),
-        browns_vs_steelers: getGameResult(week17Games, 'CLE')
+        raiders_vs_giants: getGameStatus(week17Probs, 'LV'),
+        jets_vs_patriots: getGameStatus(week17Probs, 'NYJ'),
+        browns_vs_steelers: getGameStatus(week17Probs, 'CLE')
       },
       week18: {
-        giants_vs_cowboys: getGameResult(week18Games, 'NYG'),
-        raiders_vs_chiefs: getGameResult(week18Games, 'LV'),
-        jets_vs_bills: getGameResult(week18Games, 'NYJ'),
-        browns_vs_bengals: getGameResult(week18Games, 'CLE')
+        giants_vs_cowboys: getGameStatus(week18Probs, 'NYG'),
+        raiders_vs_chiefs: getGameStatus(week18Probs, 'LV'),
+        jets_vs_bills: getGameStatus(week18Probs, 'NYJ'),
+        browns_vs_bengals: getGameStatus(week18Probs, 'CLE')
       }
     }
 
     // W17 probabilities
-    const P_raiders_w17 = getWinProb(week17Probs, week17Games, 'LV')
-    const P_jets_w17_win = getWinProb(week17Probs, week17Games, 'NYJ')
-    const P_browns_w17_win = getWinProb(week17Probs, week17Games, 'CLE')
+    const P_raiders_w17 = getWinProb(week17Probs, 'LV')
+    const P_jets_w17_win = getWinProb(week17Probs, 'NYJ')
+    const P_browns_w17_win = getWinProb(week17Probs, 'CLE')
 
     // W18 probabilities
-    const P_giants_w18 = getWinProb(week18Probs, week18Games, 'NYG')
-    const P_raiders_w18 = getWinProb(week18Probs, week18Games, 'LV')
-    const P_jets_w18_win = getWinProb(week18Probs, week18Games, 'NYJ')
-    const P_browns_w18_win = getWinProb(week18Probs, week18Games, 'CLE')
+    const P_giants_w18 = getWinProb(week18Probs, 'NYG')
+    const P_raiders_w18 = getWinProb(week18Probs, 'LV')
+    const P_jets_w18_win = getWinProb(week18Probs, 'NYJ')
+    const P_browns_w18_win = getWinProb(week18Probs, 'CLE')
 
     // Derived probabilities
     const P_browns_0_2 = (1 - P_browns_w17_win) * (1 - P_browns_w18_win)
@@ -171,18 +162,14 @@ export default function LOTATracker() {
 
   const fetchLOTAData = useCallback(async () => {
     try {
-      // Fetch all data in parallel - same pattern as index.js
-      const [week17ProbsRes, week18ProbsRes, week17GamesRes, week18GamesRes] = await Promise.all([
+      // Fetch Kalshi probabilities - these already include finished game results!
+      const [week17ProbsRes, week18ProbsRes] = await Promise.all([
         fetch(`/api/kalshi-probabilities?week=17&season=${currentSeason}`),
-        fetch(`/api/kalshi-probabilities?week=18&season=${currentSeason}`),
-        fetch(`/api/games?week=17&season=${currentSeason}`),
-        fetch(`/api/games?week=18&season=${currentSeason}`)
+        fetch(`/api/kalshi-probabilities?week=18&season=${currentSeason}`)
       ])
 
       let week17Probs = {}
       let week18Probs = {}
-      let week17Games = []
-      let week18Games = []
 
       if (week17ProbsRes.ok) {
         const data = await week17ProbsRes.json()
@@ -196,17 +183,7 @@ export default function LOTATracker() {
         console.log('Week 18 probs:', week18Probs)
       }
 
-      if (week17GamesRes.ok) {
-        const data = await week17GamesRes.json()
-        week17Games = data.games || []
-      }
-
-      if (week18GamesRes.ok) {
-        const data = await week18GamesRes.json()
-        week18Games = data.games || []
-      }
-
-      const calculatedData = calculateLOTAOdds(week17Probs, week18Probs, week17Games, week18Games)
+      const calculatedData = calculateLOTAOdds(week17Probs, week18Probs)
       setLotaData(calculatedData)
       setLastUpdate(new Date())
       setError(null)
