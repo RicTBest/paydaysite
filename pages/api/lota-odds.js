@@ -2,7 +2,7 @@
 // Uses Kalshi win probabilities to calculate each team’s chance at #1 overall
 
 export default async function handler(req, res) {
-const season = req.query.season || 2024
+const season = req.query.season || 2025
 
 try {
 // Fetch Kalshi probabilities for Week 17 and Week 18, plus game results
