@@ -163,51 +163,32 @@ export default function LOTATracker() {
 
   const fetchLOTAData = useCallback(async () => {
     try {
-      setDebugInfo({ status: 'fetching...' })
+      setDebugInfo({ status: 'fetching LOTA probabilities...' })
       
-      // Fetch Kalshi probabilities - these already include finished game results!
-      const week17Url = `/api/kalshi-probabilities?week=17&season=${currentSeason}`
-      const week18Url = `/api/kalshi-probabilities?week=18&season=${currentSeason}`
+      // Use dedicated LOTA endpoint that only fetches the 4 teams we need
+      const response = await fetch(`/api/lota-probabilities?season=${currentSeason}`)
       
-      console.log('Fetching:', week17Url, week18Url)
-      
-      const week17ProbsRes = await fetch(week17Url)
-      const week18ProbsRes = await fetch(week18Url)
-
-      let week17Probs = {}
-      let week18Probs = {}
-
-      if (week17ProbsRes.ok) {
-        const data = await week17ProbsRes.json()
-        week17Probs = data.probabilities || {}
-        console.log('Week 17 probs:', week17Probs)
-      } else {
-        console.error('Week 17 fetch failed:', week17ProbsRes.status, week17ProbsRes.statusText)
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`)
       }
-
-      if (week18ProbsRes.ok) {
-        const data = await week18ProbsRes.json()
-        week18Probs = data.probabilities || {}
-        console.log('Week 18 probs:', week18Probs)
-      } else {
-        console.error('Week 18 fetch failed:', week18ProbsRes.status, week18ProbsRes.statusText)
-      }
+      
+      const data = await response.json()
+      console.log('LOTA data:', data)
 
       setDebugInfo({
-        week17Teams: Object.keys(week17Probs).length,
-        week18Teams: Object.keys(week18Probs).length,
-        week17Sample: week17Probs['NYG'] || week17Probs['LV'] || 'none',
-        week18Sample: week18Probs['NYG'] || week18Probs['LV'] || 'none'
+        week17: data.week17,
+        week18: data.week18,
+        gamesFound: data.gamesFound
       })
 
-      const calculatedData = calculateLOTAOdds(week17Probs, week18Probs)
+      const calculatedData = calculateLOTAOdds(data.week17 || {}, data.week18 || {})
       setLotaData(calculatedData)
       setLastUpdate(new Date())
       setError(null)
     } catch (err) {
       console.error('LOTA fetch error:', err)
       setError(`${err.name}: ${err.message}`)
-      setDebugInfo({ error: err.toString(), stack: err.stack })
+      setDebugInfo({ error: err.toString() })
     } finally {
       setLoading(false)
     }
