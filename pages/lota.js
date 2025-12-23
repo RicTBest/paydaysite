@@ -1,4 +1,3 @@
-```jsx
 import { useState, useEffect, useCallback } from 'react'
 import Head from 'next/head'
 
@@ -621,4 +620,3 @@ export default function LOTATracker() {
     </>
   )
 }
-```
