@@ -101,7 +101,7 @@ class NFLWeekCalculator {
       }
     } else if (week <= 22) { // Weeks 19-22 for playoffs
       return {
-        week: week - 18,
+        week: week,
         seasonType: 3, // Playoffs
         seasonYear: seasonYear
       }
