@@ -36,6 +36,7 @@ export default function Home() {
   const [leaderboard, setLeaderboard] = useState([])
   const [probabilities, setProbabilities] = useState({})
   const [games, setGames] = useState({})
+  const [gamesLoadedForWeek, setGamesLoadedForWeek] = useState(null) // Track which week's games we have
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
   const [currentWeek, setCurrentWeek] = useState(19)
@@ -68,27 +69,27 @@ export default function Home() {
       console.log(`User manually changed week from ${currentWeek} to ${newWeek}`)
       setCurrentWeek(newWeek)
       setUserSelectedWeek(true)
-      
-      setGames({})
-      setProbabilities({})
-      
-      setTimeout(() => {
-        loadDataForWeek(newWeek)
-      }, 100)
+      loadDataForWeek(newWeek, currentSeason)
     }
   }
 
-  async function loadDataForWeek(weekNumber) {
-    console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
+  async function loadDataForWeek(weekNumber, season = currentSeason) {
+    console.log(`=== LOADING DATA FOR WEEK ${weekNumber}, SEASON ${season} ===`)
     setLoading(true)
+    
+    // Clear existing game data immediately to prevent stale display
+    setGames({})
+    setGamesLoadedForWeek(null)
+    setProbabilities({})
     
     try {
       const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
       setLeaderboard(sortedLeaderboard)
 
+      // Load games and probabilities for the specific week
       await Promise.all([
         loadProbabilitiesForWeek(teams, weekNumber),
-        loadGamesForWeek(weekNumber)
+        loadGamesForWeek(weekNumber, season)
       ])
 
       setLastUpdate(new Date())
@@ -102,7 +103,7 @@ export default function Home() {
   }
 
   async function loadData() {
-    await loadDataForWeek(currentWeek)
+    await loadDataForWeek(currentWeek, currentSeason)
   }
 
   // Helper function to calculate earnings from an award
@@ -373,16 +374,30 @@ export default function Home() {
     return { ownerStats, teams, sortedLeaderboard }
   }
 
-  async function loadGamesForWeek(weekNumber) {
-    console.log(`Loading games for Week ${weekNumber}`)
+  async function loadGamesForWeek(weekNumber, season = currentSeason) {
+    console.log(`Loading games for Week ${weekNumber}, Season ${season}`)
+    
+    // Clear games first to prevent stale data
+    setGames({})
+    setGamesLoadedForWeek(null)
+    
     try {
       const { data: gamesData, error: gamesError } = await supabase
         .from('games')
         .select('*')
-        .eq('season', currentSeason)
+        .eq('season', season)
         .eq('week', weekNumber)
 
-      if (!gamesError && gamesData && gamesData.length > 0) {
+      console.log(`Games query returned ${gamesData?.length || 0} games for week ${weekNumber}`)
+      
+      if (gamesError) {
+        console.error('Error loading games:', gamesError)
+        setGames({})
+        setGamesLoadedForWeek(weekNumber)
+        return
+      }
+      
+      if (gamesData && gamesData.length > 0) {
         const gameMap = {}
         
         gamesData.forEach((game) => {
@@ -457,12 +472,17 @@ export default function Home() {
         })
         
         setGames(gameMap)
+        setGamesLoadedForWeek(weekNumber)
+        console.log(`Games set for week ${weekNumber}:`, Object.keys(gameMap).length, 'teams have games')
       } else {
         setGames({})
+        setGamesLoadedForWeek(weekNumber)
+        console.log(`No games found for week ${weekNumber}`)
       }
     } catch (error) {
       console.log('Error loading games:', error)
       setGames({})
+      setGamesLoadedForWeek(weekNumber)
     }
   }
 
@@ -496,23 +516,25 @@ export default function Home() {
         console.log('Actual week:', actualData)
         console.log('Display week:', displayData)
         
-        setCurrentSeason(actualData.season)
+        const season = actualData.season
+        const weekToLoad = displayData.week
+        
+        setCurrentSeason(season)
         setActualWeek(actualData.week)
         
         if (isInitialLoad) {
-          setCurrentWeek(displayData.week)
+          setCurrentWeek(weekToLoad)
           setIsInitialLoad(false)
         }
         
         setWeekInfo({
           actual: actualData.week,
-          display: displayData.week,
+          display: weekToLoad,
           dayOfWeek: displayData.dayOfWeek
         })
         
-        setTimeout(() => {
-          loadDataForWeek(displayData.week)
-        }, 100)
+        // Load data for the display week
+        loadDataForWeek(weekToLoad, season)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
@@ -805,7 +827,8 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {owner.teamsSorted?.map(team => {
                       const prob = probabilities[team.abbr]
-                      const game = games[team.abbr]
+                      // Only use games data if it's loaded for the current week
+                      const game = (gamesLoadedForWeek === currentWeek) ? games[team.abbr] : undefined
                       const winPercentage = prob ? (prob.winProbability * 100).toFixed(0) : null
                       
                       const teamIsPlaying = !!game
