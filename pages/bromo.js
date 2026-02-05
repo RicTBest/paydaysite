@@ -1,19 +1,51 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Award types that use direct dollar amounts (not points * 5)
+const DIRECT_AMOUNT_TYPES = [
+  'PLAYOFF_BERTH', 'PLAYOFF_BYE', 'PLAYOFF_WC_WIN', 
+  'PLAYOFF_DIV_WIN', 'PLAYOFF_CONF_WIN', 'PLAYOFF_SB_WIN',
+  'FIRST_COACH_FIRED', 'DRAFT_PICK_1', 'MVP', 'DPOY', 
+  'COTY', 'MOST_SACKS', 'MOST_INTS', 'MOST_RET_TDS',
+  'COACH_FIRED' // Keep old type for backwards compatibility
+]
+
+// Playoff award types for the playoff bar
+const PLAYOFF_TYPES = [
+  'PLAYOFF_BERTH', 'PLAYOFF_BYE', 'PLAYOFF_WC_WIN', 
+  'PLAYOFF_DIV_WIN', 'PLAYOFF_CONF_WIN', 'PLAYOFF_SB_WIN'
+]
+
+// EOY award types
+const EOY_TYPES = [
+  'FIRST_COACH_FIRED', 'COACH_FIRED', 'DRAFT_PICK_1', 'MVP', 'DPOY', 
+  'COTY', 'MOST_SACKS', 'MOST_INTS', 'MOST_RET_TDS'
+]
+
+// Playoff milestone hierarchy (in order of achievement)
+const PLAYOFF_MILESTONES = {
+  'PLAYOFF_BERTH': { label: 'Made Playoffs', amount: 10, order: 1 },
+  'PLAYOFF_BYE': { label: 'Made Div. Round', amount: 20, order: 2 },
+  'PLAYOFF_WC_WIN': { label: 'Made Div. Round', amount: 20, order: 2 },
+  'PLAYOFF_DIV_WIN': { label: 'Made Conf. Champ', amount: 35, order: 3 },
+  'PLAYOFF_CONF_WIN': { label: 'Made Super Bowl', amount: 65, order: 4 },
+  'PLAYOFF_SB_WIN': { label: 'Won Super Bowl 🏆', amount: 155, order: 5 }
+}
+
 export default function Home() {
   const [leaderboard, setLeaderboard] = useState([])
   const [probabilities, setProbabilities] = useState({})
   const [gooseData, setGooseData] = useState({})
   const [games, setGames] = useState({})
+  const [gamesLoadedForWeek, setGamesLoadedForWeek] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentSeason, setCurrentSeason] = useState(2025)
-  const [currentWeek, setCurrentWeek] = useState(3)
-  const [actualWeek, setActualWeek] = useState(3)
+  const [currentWeek, setCurrentWeek] = useState(19)
+  const [actualWeek, setActualWeek] = useState(19)
   const [lastUpdate, setLastUpdate] = useState(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [weekInfo, setWeekInfo] = useState(null)
-  const [userSelectedWeek, setUserSelectedWeek] = useState(false) // Track if user manually selected
+  const [userSelectedWeek, setUserSelectedWeek] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   useEffect(() => {
@@ -21,11 +53,10 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    // Only auto-refresh if user hasn't manually selected a week, or if enough time has passed
     const interval = setInterval(() => {
       if (autoRefresh && !userSelectedWeek) {
         console.log('Auto-refreshing data...')
-        loadData()
+        loadCurrentWeek()
       }
     }, 1 * 60 * 1000)
 
@@ -34,49 +65,40 @@ export default function Home() {
     }
   }, [autoRefresh, userSelectedWeek])
 
-  // Function to change week manually - this is the key fix
   function changeWeek(newWeek) {
-    if (newWeek >= 1 && newWeek <= 18 && newWeek !== currentWeek) {
+    if (newWeek >= 1 && newWeek <= 22 && newWeek !== currentWeek) {
       console.log(`User manually changed week from ${currentWeek} to ${newWeek}`)
       setCurrentWeek(newWeek)
-      setUserSelectedWeek(true) // Remember that user made a manual selection
-      
-      // Clear current data to show loading state
-      setGames({})
-      setProbabilities({})
-      setGooseData({})
-      
-      // Load data for the new week after state updates
-      setTimeout(() => {
-        loadDataForWeek(newWeek)
-      }, 100)
+      setUserSelectedWeek(true)
+      loadDataForWeek(newWeek, currentSeason)
     }
   }
 
-  // Separate function to load data for a specific week
-  async function loadDataForWeek(weekNumber) {
-    console.log(`=== LOADING DATA FOR WEEK ${weekNumber} ===`)
+  async function loadDataForWeek(weekNumber, season = currentSeason) {
+    console.log(`=== LOADING DATA FOR WEEK ${weekNumber}, SEASON ${season} ===`)
     setLoading(true)
     
+    // Clear existing game data immediately to prevent stale display
+    setGames({})
+    setGamesLoadedForWeek(null)
+    setProbabilities({})
+    
     try {
-      // Load all the base data first
       const { ownerStats, teams, sortedLeaderboard } = await loadBaseData()
       setLeaderboard(sortedLeaderboard)
 
-      // Then load week-specific data with the correct week number
+      // Load games and probabilities for the specific week
       await Promise.all([
         loadProbabilitiesForWeek(teams, weekNumber),
-        loadGamesForWeek(weekNumber)
+        loadGamesForWeek(weekNumber, season)
       ])
 
-      // IMPORTANT: Load goose probabilities AFTER we have the correct probabilities
-      // We need to wait a bit for probabilities state to update
-      setTimeout(async () => {
-        await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
-        setLastUpdate(new Date())
-        setLoading(false)
-        console.log(`=== WEEK ${weekNumber} DATA LOAD COMPLETE ===`)
-      }, 500)
+      // Load goose probabilities after base data
+      await loadGooseProbabilitiesForWeek(sortedLeaderboard, weekNumber)
+
+      setLastUpdate(new Date())
+      setLoading(false)
+      console.log(`=== WEEK ${weekNumber} DATA LOAD COMPLETE ===`)
 
     } catch (error) {
       console.error('Error loading data for week:', error)
@@ -84,12 +106,42 @@ export default function Home() {
     }
   }
 
-  // Modified loadData to use the current week in state
   async function loadData() {
-    await loadDataForWeek(currentWeek)
+    await loadDataForWeek(currentWeek, currentSeason)
   }
 
-  // Extract base data loading (awards, owners, teams) into separate function
+  // Helper function to calculate earnings from an award
+  function calculateAwardEarnings(award) {
+    if (DIRECT_AMOUNT_TYPES.includes(award.type)) {
+      return award.points || 0
+    } else {
+      return (award.points || 1) * 5
+    }
+  }
+
+  // Get the furthest playoff milestone for a team
+  function getFurthestPlayoffMilestone(playoffDetails) {
+    if (!playoffDetails || playoffDetails.length === 0) return null
+    
+    let furthest = null
+    let highestOrder = 0
+    
+    playoffDetails.forEach(detail => {
+      const milestone = PLAYOFF_MILESTONES[detail.type]
+      if (milestone && milestone.order > highestOrder) {
+        highestOrder = milestone.order
+        furthest = {
+          type: detail.type,
+          label: milestone.label,
+          amount: milestone.amount,
+          order: milestone.order
+        }
+      }
+    })
+    
+    return furthest
+  }
+
   async function loadBaseData() {
     let awards = []
     try {
@@ -155,6 +207,9 @@ export default function Home() {
           obo: 0,
           dbo: 0,
           eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: [],
           teams: {}
         }
       }
@@ -167,34 +222,53 @@ export default function Home() {
           wins: 0,
           obo: 0,
           dbo: 0,
-          eoy: 0
+          eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: []
         }
       }
       
-      const points = award.points || 1
-      const earnings = points * 5
+      const earnings = calculateAwardEarnings(award)
       
       ownerStats[ownerId].totalEarnings += earnings
       ownerStats[ownerId].teams[teamAbbr].earnings += earnings
       
-      switch (award.type) {
-        case 'WIN':
-        case 'TIE_AWAY':
-          ownerStats[ownerId].wins += 1
-          ownerStats[ownerId].teams[teamAbbr].wins += 1
-          break
-        case 'OBO':
-          ownerStats[ownerId].obo += 1
-          ownerStats[ownerId].teams[teamAbbr].obo += 1
-          break
-        case 'DBO':
-          ownerStats[ownerId].dbo += 1
-          ownerStats[ownerId].teams[teamAbbr].dbo += 1
-          break
-        case 'COACH_FIRED':
-          ownerStats[ownerId].eoy += 1
-          ownerStats[ownerId].teams[teamAbbr].eoy += 1
-          break
+      if (PLAYOFF_TYPES.includes(award.type)) {
+        ownerStats[ownerId].playoffs += earnings
+        ownerStats[ownerId].teams[teamAbbr].playoffs += earnings
+        ownerStats[ownerId].playoffDetails.push({
+          team: teamAbbr,
+          type: award.type,
+          amount: earnings,
+          notes: award.notes
+        })
+        ownerStats[ownerId].teams[teamAbbr].playoffDetails.push({
+          type: award.type,
+          amount: earnings,
+          notes: award.notes
+        })
+      } else if (EOY_TYPES.includes(award.type)) {
+        ownerStats[ownerId].eoy += 1
+        ownerStats[ownerId].eoyDollars += earnings
+        ownerStats[ownerId].teams[teamAbbr].eoy += 1
+        ownerStats[ownerId].teams[teamAbbr].eoyDollars += earnings
+      } else {
+        switch (award.type) {
+          case 'WIN':
+          case 'TIE_AWAY':
+            ownerStats[ownerId].wins += 1
+            ownerStats[ownerId].teams[teamAbbr].wins += 1
+            break
+          case 'OBO':
+            ownerStats[ownerId].obo += 1
+            ownerStats[ownerId].teams[teamAbbr].obo += 1
+            break
+          case 'DBO':
+            ownerStats[ownerId].dbo += 1
+            ownerStats[ownerId].teams[teamAbbr].dbo += 1
+            break
+        }
       }
     })
 
@@ -213,6 +287,9 @@ export default function Home() {
           obo: 0,
           dbo: 0,
           eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: [],
           teams: {}
         }
       }
@@ -225,7 +302,10 @@ export default function Home() {
           wins: 0,
           obo: 0,
           dbo: 0,
-          eoy: 0
+          eoy: 0,
+          eoyDollars: 0,
+          playoffs: 0,
+          playoffDetails: []
         }
       }
     })
@@ -250,53 +330,44 @@ export default function Home() {
     })
     allTeams.sort((a, b) => b.earnings - a.earnings)
     
-  // Sort all teams by earnings (highest to lowest)
-  allTeams.sort((a, b) => b.earnings - a.earnings)
-  
-  // Calculate quintile boundaries based on team positions, not unique values
-  const totalTeams = allTeams.length
-  const quintileBoundaries = [
-    Math.ceil(totalTeams * 0.2), // Top 20%
-    Math.ceil(totalTeams * 0.4), // Top 40% 
-    Math.ceil(totalTeams * 0.6), // Top 60%
-    Math.ceil(totalTeams * 0.8), // Top 80%
-    totalTeams                    // Bottom 100%
-  ]
+    const totalTeams = allTeams.length
+    const quintileBoundaries = [
+      Math.ceil(totalTeams * 0.2),
+      Math.ceil(totalTeams * 0.4),
+      Math.ceil(totalTeams * 0.6),
+      Math.ceil(totalTeams * 0.8),
+      totalTeams
+    ]
 
-  // Assign quintiles based on team position, but ensure ties stay together
-  allTeams.forEach((team, index) => {
-    // Find which quintile this position falls into
-    let quintile = 5 // Default to bottom quintile
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (index < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+    allTeams.forEach((team, index) => {
+      let quintile = 5
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (index < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
-    
-    // But if there are ties, promote lower-positioned tied teams to higher quintile
-    const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
-    const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
-    
-    // Recalculate quintile based on best position for this earnings group
-    for (let i = 0; i < quintileBoundaries.length; i++) {
-      if (bestPositionForThisEarning < quintileBoundaries[i]) {
-        quintile = i + 1
-        break
+      
+      const sameEarningsTeams = allTeams.filter(t => t.earnings === team.earnings)
+      const bestPositionForThisEarning = Math.min(...sameEarningsTeams.map(t => allTeams.indexOf(t)))
+      
+      for (let i = 0; i < quintileBoundaries.length; i++) {
+        if (bestPositionForThisEarning < quintileBoundaries[i]) {
+          quintile = i + 1
+          break
+        }
       }
-    }
-    
-    // Convert quintile to percentile for your existing gradient logic
-    team.performancePercentile = quintile === 1 ? 0.9 :
-                                quintile === 2 ? 0.7 :
-                                quintile === 3 ? 0.5 :
-                                quintile === 4 ? 0.3 : 0.1
-  })
+      
+      team.performancePercentile = quintile === 1 ? 0.9 :
+                                  quintile === 2 ? 0.7 :
+                                  quintile === 3 ? 0.5 :
+                                  quintile === 4 ? 0.3 : 0.1
+    })
   
-  const teamPerformanceMap = {}
-  allTeams.forEach(team => {
-    teamPerformanceMap[team.abbr] = team.performancePercentile
-  })
+    const teamPerformanceMap = {}
+    allTeams.forEach(team => {
+      teamPerformanceMap[team.abbr] = team.performancePercentile
+    })
     
     sortedLeaderboard.forEach(owner => {
       owner.teamsSorted = Object.values(owner.teams)
@@ -310,16 +381,30 @@ export default function Home() {
     return { ownerStats, teams, sortedLeaderboard }
   }
 
-  async function loadGamesForWeek(weekNumber) {
-    console.log(`Loading games for Week ${weekNumber}`)
+  async function loadGamesForWeek(weekNumber, season = currentSeason) {
+    console.log(`Loading games for Week ${weekNumber}, Season ${season}`)
+    
+    // Clear games first to prevent stale data
+    setGames({})
+    setGamesLoadedForWeek(null)
+    
     try {
       const { data: gamesData, error: gamesError } = await supabase
         .from('games')
         .select('*')
-        .eq('season', currentSeason)
+        .eq('season', season)
         .eq('week', weekNumber)
 
-      if (!gamesError && gamesData && gamesData.length > 0) {
+      console.log(`Games query returned ${gamesData?.length || 0} games for week ${weekNumber}`)
+      
+      if (gamesError) {
+        console.error('Error loading games:', gamesError)
+        setGames({})
+        setGamesLoadedForWeek(weekNumber)
+        return
+      }
+      
+      if (gamesData && gamesData.length > 0) {
         const gameMap = {}
         
         gamesData.forEach((game) => {
@@ -394,12 +479,17 @@ export default function Home() {
         })
         
         setGames(gameMap)
+        setGamesLoadedForWeek(weekNumber)
+        console.log(`Games set for week ${weekNumber}:`, Object.keys(gameMap).length, 'teams have games')
       } else {
         setGames({})
+        setGamesLoadedForWeek(weekNumber)
+        console.log(`No games found for week ${weekNumber}`)
       }
     } catch (error) {
       console.log('Error loading games:', error)
       setGames({})
+      setGamesLoadedForWeek(weekNumber)
     }
   }
 
@@ -409,17 +499,8 @@ export default function Home() {
       const response = await fetch(`/api/kalshi-probabilities?week=${weekNumber}&season=${currentSeason}`)
       if (response.ok) {
         const data = await response.json()
-        
-        const adjustedProbabilities = { ...data.probabilities }
-        
-        teams?.forEach(team => {
-          if (!adjustedProbabilities[team.abbr]) {
-            adjustedProbabilities[team.abbr] = { winProbability: 0, confidence: 'bye_week' }
-          }
-        })
-        
-        setProbabilities(adjustedProbabilities || {})
-        console.log(`Probabilities loaded for Week ${weekNumber}:`, Object.keys(adjustedProbabilities).length, 'teams')
+        setProbabilities(data.probabilities || {})
+        console.log(`Probabilities loaded for Week ${weekNumber}:`, Object.keys(data.probabilities || {}).length, 'teams')
       }
     } catch (error) {
       console.error('Error loading probabilities:', error)
@@ -439,9 +520,8 @@ export default function Home() {
           },
           body: JSON.stringify({
             owner_id: owner.id,
-            week: weekNumber, // Use the specific week number
+            week: weekNumber,
             season: currentSeason
-            // Don't pass probabilities - let the API fetch them fresh for this week
           })
         })
         
@@ -458,10 +538,7 @@ export default function Home() {
       gooseResults.forEach(result => {
         gooseMap[result.ownerId] = result
       })
-      setGooseData({}) // Clear old data first
-      setTimeout(() => {
-        setGooseData(gooseMap) // Set new data after brief delay
-      }, 50)
+      setGooseData(gooseMap)
       console.log(`Goose probabilities loaded for Week ${weekNumber}`)
     } catch (error) {
       console.error('Error loading goose probabilities:', error)
@@ -483,25 +560,25 @@ export default function Home() {
         console.log('Actual week:', actualData)
         console.log('Display week:', displayData)
         
-        setCurrentSeason(actualData.season)
+        const season = actualData.season
+        const weekToLoad = displayData.week
+        
+        setCurrentSeason(season)
         setActualWeek(actualData.week)
         
-        // Only use smart default on initial load, not if user has made a selection
         if (isInitialLoad) {
-          setCurrentWeek(displayData.week) // This sets it to 4
+          setCurrentWeek(weekToLoad)
           setIsInitialLoad(false)
         }
         
         setWeekInfo({
           actual: actualData.week,
-          display: displayData.week,
+          display: weekToLoad,
           dayOfWeek: displayData.dayOfWeek
         })
         
-        // FIXED: Use displayData.week directly instead of relying on state
-        setTimeout(() => {
-          loadDataForWeek(displayData.week) // Pass Week 4 directly
-        }, 100)
+        // Load data for the display week
+        loadDataForWeek(weekToLoad, season)
       }
     } catch (error) {
       console.error('Error getting current week:', error)
@@ -509,24 +586,36 @@ export default function Home() {
     }
   }
 
-  function getDayOfWeekName(dayOfWeek) {
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    return days[dayOfWeek] || 'Unknown'
+  function getWeekDisplayName(week) {
+    if (week <= 18) return `Week ${week}`
+    if (week === 19) return 'Wild Card Weekend'
+    if (week === 20) return 'Divisional Round'
+    if (week === 21) return 'Conference Championships'
+    if (week === 22) return 'Super Bowl'
+    return `Week ${week}`
   }
 
-  function getWeekDisplayLogic() {
-    if (!weekInfo) return ''
+  // Helper to format playoff progress for owner display
+  function formatOwnerPlayoffProgress(playoffDetails) {
+    if (!playoffDetails || playoffDetails.length === 0) return null
     
-    const dayName = getDayOfWeekName(weekInfo.dayOfWeek)
+    // Group by team and find furthest milestone for each
+    const byTeam = {}
+    playoffDetails.forEach(d => {
+      if (!byTeam[d.team]) byTeam[d.team] = []
+      byTeam[d.team].push(d)
+    })
     
-    if (userSelectedWeek) {
-      return `Manual selection: Week ${currentWeek}`
-    }
+    // Get furthest milestone per team
+    const teamMilestones = {}
+    Object.entries(byTeam).forEach(([team, details]) => {
+      const furthest = getFurthestPlayoffMilestone(details)
+      if (furthest) {
+        teamMilestones[team] = furthest
+      }
+    })
     
-    if (weekInfo.actual !== weekInfo.display) {
-      return `${dayName}: Showing Week ${weekInfo.display} (NFL is currently in Week ${weekInfo.actual})`
-    }
-    return `${dayName}: Showing current NFL Week ${weekInfo.display}`
+    return teamMilestones
   }
 
   if (loading && leaderboard.length === 0) {
@@ -540,6 +629,8 @@ export default function Home() {
     )
   }
 
+  const isPlayoffs = currentWeek >= 19
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-100 to-teal-200">
       <div className="bg-white shadow-xl border-b-4 border-emerald-500 relative overflow-hidden">
@@ -552,7 +643,7 @@ export default function Home() {
               </h1>
               <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6 text-emerald-600">
                 <span className="font-bold text-lg bg-emerald-100 px-3 py-1 rounded-full w-fit">
-                  Week {currentWeek} • {currentSeason} Season
+                  {getWeekDisplayName(currentWeek)} • {currentSeason} Season
                 </span>
                 {lastUpdate && (
                   <span className="text-sm bg-white px-2 py-1 rounded-full shadow w-fit">
@@ -582,15 +673,19 @@ export default function Home() {
                 <select
                   value={currentWeek}
                   onChange={(e) => changeWeek(parseInt(e.target.value))}
-                  className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded text-sm min-w-[90px] text-center"
+                  className="bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded text-sm min-w-[140px] text-center"
                 >
                   {Array.from({ length: 18 }, (_, i) => i + 1).map(w => (
                     <option key={w} value={w}>Week {w}</option>
                   ))}
+                  <option value={19}>Wild Card</option>
+                  <option value={20}>Divisional</option>
+                  <option value={21}>Conf. Champ</option>
+                  <option value={22}>Super Bowl</option>
                 </select>
                 <button
                   onClick={() => changeWeek(currentWeek + 1)}
-                  disabled={currentWeek >= 18}
+                  disabled={currentWeek >= 22}
                   className="bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 font-bold py-1 px-3 rounded transition-colors text-sm"
                 >
                   Next →
@@ -606,7 +701,7 @@ export default function Home() {
                   }}
                   className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium py-1 px-3 rounded text-sm transition-colors"
                 >
-                  Reset to Smart Default (Week {weekInfo.display})
+                  Reset to Smart Default ({getWeekDisplayName(weekInfo.display)})
                 </button>
               )}
 
@@ -662,6 +757,9 @@ export default function Home() {
             const isLeader = rank === 1
             const isTop3 = rank <= 3
             
+            const ownerPlayoffMilestones = formatOwnerPlayoffProgress(owner.playoffDetails)
+            const hasPlayoffs = owner.playoffs > 0
+            
             const getRankEmoji = (rank) => {
               if (rank === 1) return '👑'
               if (rank === 2) return '🥈'
@@ -711,6 +809,7 @@ export default function Home() {
                     </div>
                     
                     <div className="flex flex-col sm:text-right space-y-3">
+                      {/* Regular Season Stats */}
                       <div className="flex flex-wrap gap-2">
                         <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
                           🏆 {owner.wins}
@@ -722,10 +821,27 @@ export default function Home() {
                           🛡️ {owner.dbo}
                         </span>
                         <span className="bg-gradient-to-r from-red-500 to-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-bold shadow">
-                          🏁 {owner.eoy}
+                          🏁 ${owner.eoyDollars || 0}
                         </span>
                       </div>
                       
+                      {/* Playoff Bar - Shows furthest milestone per team */}
+                      {hasPlayoffs && ownerPlayoffMilestones && (
+                        <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-yellow-900 px-3 py-2 rounded-lg shadow-lg">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-black text-sm">🏈 PLAYOFFS: ${owner.playoffs}</span>
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(ownerPlayoffMilestones).map(([team, milestone]) => (
+                                <span key={team} className="text-xs bg-yellow-200 px-2 py-0.5 rounded-full font-semibold">
+                                  {team}: {milestone.label} (${milestone.amount})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Goose Risk */}
                       <div className={`text-xs sm:text-sm font-bold px-3 sm:px-4 py-2 rounded-full shadow-lg w-fit ${
                         goose.gooseProbability > 0.1 ? 'bg-gradient-to-r from-red-500 to-red-600 text-white animate-pulse' :
                         goose.gooseProbability > 0.05 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
@@ -752,17 +868,19 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {owner.teamsSorted?.map(team => {
                       const prob = probabilities[team.abbr]
-                      const game = games[team.abbr]
-                      const winPercentage = prob ? (prob.winProbability * 100).toFixed(0) : 'N/A'
+                      // Only use games data if it's loaded for the current week
+                      const game = (gamesLoadedForWeek === currentWeek) ? games[team.abbr] : undefined
+                      const winPercentage = prob ? (prob.winProbability * 100).toFixed(0) : null
                       
+                      const teamIsPlaying = !!game
                       const gameIsComplete = game?.status === 'STATUS_FINAL'
-                      const showLiveProbability = prob && prob.confidence !== 'final' && !gameIsComplete && game
+                      const showLiveProbability = teamIsPlaying && prob && prob.confidence !== 'final' && !gameIsComplete
                       
                       let opponentText = ''
                       let enhancedStatusText = ''
                       
                       if (!game) {
-                        opponentText = 'Bye Week'
+                        opponentText = isPlayoffs ? '' : 'Bye Week'
                         enhancedStatusText = ''
                       } else {
                         const parts = game.enhancedStatus.split('|')
@@ -788,6 +906,9 @@ export default function Home() {
                         team.performancePercentile >= 0.2 ? 'border-orange-300' :
                         'border-red-300'
                       
+                      // Get furthest playoff milestone for this team
+                      const teamPlayoffMilestone = getFurthestPlayoffMilestone(team.playoffDetails)
+                      
                       return (
                         <div key={team.abbr} className={`bg-white rounded-xl p-3 sm:p-4 shadow-lg hover:shadow-xl transition-all transform hover:scale-105 border-2 ${performanceBorder}`}>
                           <div className="flex justify-between items-start mb-3 sm:mb-4">
@@ -802,9 +923,18 @@ export default function Home() {
                               />
                               <div className="min-w-0 flex-1">
                                 <div className="font-black text-lg sm:text-xl text-gray-800">{team.abbr}</div>
-                                <div className="text-xs sm:text-sm text-gray-600 font-medium truncate">{opponentText}</div>
-                                {enhancedStatusText && (
-                                  <div className="text-xs text-gray-500 font-medium truncate">{enhancedStatusText}</div>
+                                {/* Show opponent info only if team is playing OR it's regular season bye */}
+                                {teamIsPlaying ? (
+                                  <>
+                                    <div className="text-xs sm:text-sm text-gray-600 font-medium truncate">{opponentText}</div>
+                                    {enhancedStatusText && (
+                                      <div className="text-xs text-gray-500 font-medium truncate">{enhancedStatusText}</div>
+                                    )}
+                                  </>
+                                ) : (
+                                  !isPlayoffs && opponentText && (
+                                    <div className="text-xs sm:text-sm text-gray-600 font-medium truncate">{opponentText}</div>
+                                  )
                                 )}
                               </div>
                             </div>
@@ -812,7 +942,8 @@ export default function Home() {
                               <div className={`font-black text-base sm:text-lg bg-gradient-to-r ${performanceGradient} bg-clip-text text-transparent`}>
                                 ${team.earnings}
                               </div>
-                              {showLiveProbability && (
+                              {/* Only show probability if team is playing */}
+                              {showLiveProbability && winPercentage && (
                                 <div className={`text-xs px-2 py-1 rounded-full font-bold shadow mt-1 ${
                                   prob.winProbability > 0.6 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
                                   prob.winProbability > 0.4 ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white' :
@@ -821,7 +952,8 @@ export default function Home() {
                                   {winPercentage}%
                                 </div>
                               )}
-                              {gameIsComplete && gameResultIcon && (
+                              {/* Only show result if team played */}
+                              {teamIsPlaying && gameIsComplete && gameResultIcon && (
                                 <div className={`text-base sm:text-lg font-bold mt-1 ${
                                   gameResultIcon === '✅' ? 'text-green-600' : 'text-red-600'
                                 }`}>
@@ -831,7 +963,8 @@ export default function Home() {
                             </div>
                           </div>
                           
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-1">
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-4 gap-1 sm:gap-1">
                             <div className="text-center bg-blue-50 rounded-lg p-1.5 sm:p-2">
                               <div className="font-black text-blue-600 text-sm sm:text-lg">{team.wins}</div>
                               <div className="text-xs text-blue-500 font-bold">WINS</div>
@@ -845,10 +978,26 @@ export default function Home() {
                               <div className="text-xs text-purple-500 font-bold">DBO</div>
                             </div>
                             <div className="text-center bg-red-50 rounded-lg p-1.5 sm:p-2">
-                              <div className="font-black text-red-600 text-sm sm:text-lg">{team.eoy}</div>
+                              <div className="font-black text-red-600 text-sm sm:text-lg">${team.eoyDollars || 0}</div>
                               <div className="text-xs text-red-500 font-bold">EOY</div>
                             </div>
                           </div>
+                          
+                          {/* Playoff Milestone - Shows ONE thing with dollar amount */}
+                          {teamPlayoffMilestone && (
+                            <div className={`mt-2 rounded-lg px-3 py-1.5 text-center ${
+                              teamPlayoffMilestone.order >= 5 ? 'bg-gradient-to-r from-yellow-400 to-amber-500' :
+                              teamPlayoffMilestone.order >= 4 ? 'bg-yellow-100' :
+                              teamPlayoffMilestone.order >= 3 ? 'bg-yellow-50' :
+                              'bg-gray-50'
+                            }`}>
+                              <span className={`font-black text-sm ${
+                                teamPlayoffMilestone.order >= 5 ? 'text-yellow-900' : 'text-yellow-700'
+                              }`}>
+                                🏈 {teamPlayoffMilestone.label}: ${teamPlayoffMilestone.amount}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )
                     })}
